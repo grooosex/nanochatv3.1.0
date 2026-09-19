@@ -147,7 +147,6 @@ export function ChatPane({ chat }: { chat: Chat }) {
               Boolean(imageTrayOffer && imageTrayOffer.chatId === chat.id && imageTrayOffer.msgId === m.id && lastAssistId === m.id)
             }
             onUseOption={(t) => {
-              if (editUser) return;
               useApp.getState().setComposerDraft(chat.id, t);
               requestAnimationFrame(() => inputRef.current?.focus());
             }}

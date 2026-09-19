@@ -93,13 +93,9 @@ guro：guro, gore, blood, decapitation, dismemberment, amputee, organs, intestin
 - 「输出 JSON」：只输出一个 JSON 对象，不要围栏，不要解释。JSON 只是分拣单，不会被写进 NAI。
   {"base":"人数、场景、镜头、光线、彼此位置关系","chars":{"角色中文名":"该角色本轮动作表情姿势服装状态"},"absent":["不在镜头的角色名"]}
   chars 的键必须逐字用用户给的角色名，禁止 girl、char1、1girl、角色1。
-  该角色的互动写在她自己的值里：source#teasing, target#teasing, mutual#kiss。
   不在镜头的只放 absent，不要出现在 chars。没人离开则 "absent":[]。
   base 写人数 2girls / 1boy 1girl；chars 值里写 girl 或 boy，不要 1girl。
   无脸男：faceless male。
-
-【多人原版】
-用户若要求原版：一行 tag，用 char1: ... char2: ... 区分，不要 JSON，不要 ENABLED。
 
 【反例 → 正例】（说明怎么跟画面走，不是固定配方）
 错：shirt_collar_crooked, sitting_on_sofa, teasing_pose
@@ -127,6 +123,29 @@ export const IMAGE_BG_RULES = `【背景】
 对白完全看不出人在哪，才用下面的「上一镜地点」；没有就不要写地点，不要编。
 地点写在你输出的最前面（多人写在 base 最前）。
 不要从长期记忆抄地点。`;
+
+export const IMAGE_MULTI_RULES = `【多人互动——必须遵守】
+一张图 = 总提示 base + 每人一条 chars。不要用 | 分隔。不要输出 ENABLED，不要输出坐标。
+
+总提示（base）：人数、场景、构图、光、道具、群体氛围。人数必须在 base：2girls / 1girl, 1boy。地点写最前。不要写 source# / target# / mutual#。群体动作词（yuri, ffm threesome, sex from behind）可以留在 base，谁对谁仍拆到各人。
+
+各角色（chars）：接到该角色自己的正面提示词后面。以 girl 或 boy 起头（不要 1girl）。只写这一人此刻的姿势、表情、视角、服装即时状态、动作。不要写发色瞳色发型体型种族。无脸男：faceless male。
+chars 的键必须逐字用用户给的角色名，禁止 girl、char1、1girl、角色1。
+
+互动前缀只写在对应角色的 chars 里，不要写在 base。同一动作、同一词根，两边成对：
+- 施动 source#kiss / source#hug / source#grabbing / source#holding hands / source#pointing at another / source#sex / source#fellatio / source#paizuri
+- 接收 target#kiss / target#hug / target#grabbing / target#holding hands / target#pointing / target#sex / target#fellatio / target#paizuri
+- 互相两边都 mutual#kiss / mutual#hug / mutual#looking at each other / mutual#holding hands
+谁伸手、谁被抱、谁在上面，一定拆到对应人。没有互动就不要硬加这些前缀。
+
+插入版 JSON 样例（把角色名换成用户给的）：
+{"base":"2girls, indoors, bedroom, from side, looking at another","chars":{"角色甲":"girl, source#kiss, sitting, blush, open mouth","角色乙":"girl, target#kiss, standing, half-closed eyes"},"absent":[]}
+
+原版一行样例：
+char1: girl, source#kiss, sitting, blush  char2: girl, target#kiss, standing, half-closed eyes
+
+官方指人：施动 source#pointing at another，被指 target#pointing。
+不在镜头的只放 absent，不要出现在 chars。没人离开则 "absent":[]。`;
 
 export function splitChatPrompt(full: string): {
   visible: string;
@@ -160,7 +179,7 @@ ${IMAGE_SHOT_RULES}
 
 ${IMAGE_BG_RULES}
 
-上一镜地点（对白看不出人在哪时才用，只借人所在的地方）：
+${chat.isMulti ? `${IMAGE_MULTI_RULES}\n\n` : ""}上一镜地点（对白看不出人在哪时才用，只借人所在的地方）：
 ${prevScene.trim() || "（无）"}
 
 ${adult}

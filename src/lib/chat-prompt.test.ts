@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { splitChatPrompt, chatImageSystem, IMAGE_SYSTEM, IMAGE_SHOT_RULES, IMAGE_BG_RULES, systemFor, statusBarSkeleton } from "./prompts.ts";
+import { splitChatPrompt, chatImageSystem, IMAGE_SYSTEM, IMAGE_SHOT_RULES, IMAGE_BG_RULES, IMAGE_MULTI_RULES, systemFor, statusBarSkeleton } from "./prompts.ts";
 import { emptyCharacter, defaultImageParams } from "./constants.ts";
 import type { Chat } from "./types.ts";
 
@@ -94,6 +94,31 @@ describe("chatImageSystem", () => {
   it("tells the model whether adult boost is on", () => {
     assert.match(chatImageSystem(stub({ adultBoost: true })), /【成人提示词加强】开/);
     assert.match(chatImageSystem(stub({ adultBoost: false })), /【成人提示词加强】关/);
+  });
+
+  it("keeps 本镜/背景 for everyone, and only hangs 互动 rules on multi chats", () => {
+    const single = chatImageSystem(stub({ isMulti: false }));
+    assert.ok(single.includes(IMAGE_SHOT_RULES));
+    assert.ok(single.includes(IMAGE_BG_RULES));
+    assert.doesNotMatch(single, /【多人互动/);
+    assert.doesNotMatch(single, /source#kiss/);
+    assert.doesNotMatch(single, /source#teasing/);
+
+    const multi = chatImageSystem(
+      stub({
+        isMulti: true,
+        promptMode: "insert",
+        characters: [emptyCharacter(1), emptyCharacter(2)],
+      }),
+    );
+    assert.ok(multi.includes(IMAGE_SHOT_RULES));
+    assert.ok(multi.includes(IMAGE_BG_RULES));
+    assert.ok(multi.includes(IMAGE_MULTI_RULES));
+    assert.match(multi, /source#kiss/);
+    assert.match(multi, /target#kiss/);
+    assert.match(multi, /mutual#kiss/);
+    assert.doesNotMatch(multi, /source#teasing/);
+    assert.match(multi, /不要输出 ENABLED/);
   });
 });
 

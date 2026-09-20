@@ -142,6 +142,7 @@ export function buildPolishUserContent(chat: Chat): string {
     speech: c.speech,
     appearance: c.appearance,
     appearanceLocked: Boolean(c.appearance.trim()),
+    personaVoices: Boolean(c.personaVoices),
   }));
   const extras = [...chat.extras, ...chat.characters.flatMap((c) => c.extras)]
     .map((e) => e.body.trim())

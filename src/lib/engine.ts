@@ -1,17 +1,18 @@
 import { grokOnce, grokStream } from "./grok-client";
-import { chatContextBlock, fieldPolishHint, groupFormatHint, IMAGE_BG_RULES, IMAGE_MULTI_RULES, IMAGE_SHOT_RULES, roleSnapshot, splitChatPrompt, statusBarFor } from "./prompts";
-import { buildPolishUserContent, extractFieldText, parsePolishJson } from "./role-polish";
+import { chatContextBlock, fieldPolishHint, groupFormatHint, IMAGE_BG_RULES, IMAGE_MULTI_RULES, IMAGE_SHOT_RULES, roleSnapshot, splitChatPrompt, statusBarFor, voicePolishExtra } from "./prompts";
+import { buildPolishUserContent, extractFieldText, parsePolishJson, stripRoleOutput } from "./role-polish";
 import { formatUserForChat } from "./user-markup";
 import { stripSpeakerPrefix } from "./rp-text";
 import { replyContextText } from "./reply-markup.ts";
 import { resolveImageWrite, imageWriteFields } from "./image-ai.ts";
 import { buildNaiPayload } from "./nai";
 import { sanitizeNaiTags, assignCharTags, extractJsonObject, resolveAbsentIds } from "./nai-tags";
-import { RECENT_TURNS } from "./constants";
+import { IMAGE_GEN_TIMEOUT_MS, RECENT_TURNS } from "./constants";
 import { saveBlob, useApp } from "./store";
 import { presetStyle } from "./st-preset";
 import type { Chat, ChatMessage, GenImage, GrokModelId } from "./types";
 import { randomSeed, uid } from "./utils";
+import { imageFailText } from "./image-status";
 import {
   clipMemoryText,
   foldIntervalMessages,
@@ -61,12 +62,15 @@ function historyMessages(chat: Chat, upto?: number) {
 
 export async function polishAll(chat: Chat, grokModelId: GrokModelId, instruction?: string) {
   const style = presetStyle(useApp.getState().settings, "polish", chat);
+  const voice = voicePolishExtra(chat);
+  const extra = [voice, instruction?.trim() || ""].filter(Boolean).join("\n\n") || undefined;
   const text = await grokOnce({
     task: instruction?.trim() ? "personalize" : "polish",
     grokModelId,
-    extraSystem: instruction?.trim() || undefined,
+    extraSystem: extra,
     messages: [{ role: "user", content: buildPolishUserContent(chat) }],
     ...style,
+    ...(voice ? { max_tokens: 6000 } : {}),
   });
   return parsePolishJson(text);
 }
@@ -77,6 +81,7 @@ export async function polishField(
   field: string,
   instruction?: string,
   charId?: string,
+  onDelta?: (t: string) => void,
 ) {
   const char = charId ? chat.characters.find((c) => c.id === charId) : undefined;
   const charIndex = charId ? chat.characters.findIndex((c) => c.id === charId) : -1;
@@ -94,14 +99,20 @@ export async function polishField(
           ? `角色「${char.name}」`
           : "角色"
         : undefined;
-  const text = await grokOnce({
+  const voices = field === "persona" && Boolean(char?.personaVoices);
+  const payload: Record<string, unknown> = {
     task: "field",
     grokModelId,
-    extraSystem: fieldPolishHint({ field, instruction, current, charLabel }),
+    extraSystem: fieldPolishHint({ field, instruction, current, charLabel, voices }),
     messages: [{ role: "user", content: roleSnapshot(chat) }],
-    max_tokens: 2000,
+    max_tokens: voices ? 4500 : 2000,
     ...presetStyle(useApp.getState().settings, "field", chat),
-  });
+  };
+  if (voices && onDelta) {
+    const text = await grokStream(payload, (t) => onDelta(stripRoleOutput(t)));
+    return extractFieldText(text, field);
+  }
+  const text = await grokOnce(payload);
   return extractFieldText(text, field);
 }
 
@@ -225,6 +236,7 @@ export async function writeImageTags(
   grokModelId: GrokModelId,
   shotText?: string,
   prevScene?: string,
+  signal?: AbortSignal,
 ) {
   const extra = [
     chat.adultBoost
@@ -244,17 +256,15 @@ export async function writeImageTags(
     ...imageWriteFields(imageModelId),
   };
   if (!dest.split) payload.grokModelId = grokModelId;
-  const text = await grokOnce(payload);
+  const text = await grokOnce(payload, withImageTimeout(signal));
   return parseImageTagOutput(text, chat);
 }
 
-export function genPhaseLabel(status: GenImage["status"] | null | undefined, error?: string) {
-  if (status === "writing") return "写提示词中";
-  if (status === "uploading") return "上传中";
-  if (status === "generating") return "生图中";
-  if (status === "receiving") return "回传中";
-  if (status === "error") return error?.trim() || "生图失败";
-  return "";
+export { genPhaseLabel, imageFailText, prettyImageError, settleStuckImages } from "./image-status";
+
+function withImageTimeout(user?: AbortSignal) {
+  const timeout = AbortSignal.timeout(IMAGE_GEN_TIMEOUT_MS);
+  return user ? AbortSignal.any([user, timeout]) : timeout;
 }
 
 export function afterPaint() {
@@ -270,6 +280,7 @@ export async function generateNai(opts: {
   baseUrl: string;
   onStart?: () => void;
   onReceiving?: () => void;
+  signal?: AbortSignal;
 }) {
   const built = buildNaiPayload({
     params: opts.chat.imageParams,
@@ -279,17 +290,29 @@ export async function generateNai(opts: {
     seed: opts.seed,
   });
   opts.onStart?.();
-  const res = await fetch("/api/nai", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      action: "generate",
-      baseUrl: opts.baseUrl,
-      apiKey: opts.apiKey,
-      payload: { input: built.input, model: built.model, action: "generate", parameters: built.parameters },
-    }),
-  });
-  const data = (await res.json()) as { ok: boolean; image?: string; error?: string; status?: number };
+  const signal = withImageTimeout(opts.signal);
+  let res: Response;
+  try {
+    res = await fetch("/api/nai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "generate",
+        baseUrl: opts.baseUrl,
+        apiKey: opts.apiKey,
+        payload: { input: built.input, model: built.model, action: "generate", parameters: built.parameters },
+      }),
+      signal,
+    });
+  } catch (e) {
+    throw new Error(imageFailText(e, opts.signal));
+  }
+  let data: { ok: boolean; image?: string; error?: string; status?: number };
+  try {
+    data = (await res.json()) as { ok: boolean; image?: string; error?: string; status?: number };
+  } catch (e) {
+    throw new Error(imageFailText(e, opts.signal));
+  }
   if (!data.ok || !data.image) throw new Error(data.error || "生图失败");
   opts.onReceiving?.();
   await afterPaint();

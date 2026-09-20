@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { splitChatPrompt, chatImageSystem, IMAGE_SYSTEM, IMAGE_SHOT_RULES, IMAGE_BG_RULES, IMAGE_MULTI_RULES, systemFor, statusBarSkeleton } from "./prompts.ts";
+import { splitChatPrompt, chatImageSystem, IMAGE_SYSTEM, IMAGE_SHOT_RULES, IMAGE_BG_RULES, IMAGE_MULTI_RULES, PERSONA_VOICE_RULES, fieldPolishHint, voicePolishExtra, systemFor, statusBarSkeleton, chatContextBlock } from "./prompts.ts";
+import { settleStuckImages, imageFailText, prettyImageError } from "./image-status.ts";
 import { emptyCharacter, defaultImageParams } from "./constants.ts";
 import type { Chat } from "./types.ts";
 
@@ -145,5 +146,121 @@ describe("statusBarSkeleton", () => {
     assert.match(out, /心情:/);
     assert.doesNotMatch(out, /极致惊恐/);
     assert.doesNotMatch(out, /失温/);
+  });
+});
+
+describe("persona voice rules", () => {
+  it("stays off the ordinary 人设 hint", () => {
+    const hint = fieldPolishHint({ field: "persona", current: "傲娇妹妹", charLabel: "角色「青叶」" });
+    assert.match(hint, /傲娇妹妹/);
+    assert.doesNotMatch(hint, /【人设·声部写法/);
+  });
+
+  it("hangs 声部 rules only when the toggle is on", () => {
+    const hint = fieldPolishHint({
+      field: "persona",
+      current: "傲娇妹妹",
+      charLabel: "角色「青叶」",
+      voices: true,
+    });
+    assert.ok(hint.includes(PERSONA_VOICE_RULES));
+    assert.match(hint, /声部一·社会/);
+    assert.match(hint, /声部三·（自拟标题）/);
+    assert.doesNotMatch(hint, /绘理香/);
+    assert.doesNotMatch(hint, /贫乳/);
+  });
+
+  it("marks only the characters whose toggle is on for whole-card polish", () => {
+    const off = voicePolishExtra(stub({ isMulti: true, characters: [emptyCharacter(1), emptyCharacter(2)] }));
+    assert.equal(off, "");
+    const on = voicePolishExtra(
+      stub({
+        isMulti: true,
+        characters: [{ ...emptyCharacter(1), name: "青叶", personaVoices: true }, emptyCharacter(2)],
+      }),
+    );
+    assert.match(on, /角色1「青叶」/);
+    assert.doesNotMatch(on, /角色2/);
+    assert.ok(on.includes(PERSONA_VOICE_RULES));
+  });
+
+  it("puts 声部 extra onto polish system when the big button runs", () => {
+    const extra = voicePolishExtra(stub({ characters: [{ ...emptyCharacter(1), personaVoices: true }] }));
+    const sys = systemFor("polish", extra);
+    assert.ok(sys.includes(PERSONA_VOICE_RULES));
+    assert.match(sys, /本卡唯一角色/);
+  });
+
+  it("regen prompt does not mention a previous draft", () => {
+    const block = chatContextBlock(stub(), { regen: true });
+    assert.match(block, /第一次写/);
+    assert.doesNotMatch(block, /上一稿/);
+    assert.doesNotMatch(chatContextBlock(stub()), /【重写】/);
+  });
+});
+
+describe("stuck image + move folder order", () => {
+  it("turns in-flight images into 上次生图未完成", () => {
+    const before = stub({
+      messages: [
+        {
+          id: "m1",
+          role: "assistant",
+          content: "hi",
+          createdAt: 1,
+          images: [
+            {
+              id: "g1",
+              prompt: "",
+              negative: "",
+              seed: 1,
+              model: "nai-diffusion-4-5-full",
+              width: 832,
+              height: 1216,
+              steps: 28,
+              sampler: "k_euler_ancestral",
+              status: "generating",
+              createdAt: 1,
+            },
+            {
+              id: "g2",
+              prompt: "ok",
+              negative: "",
+              seed: 2,
+              model: "nai-diffusion-4-5-full",
+              width: 832,
+              height: 1216,
+              steps: 28,
+              sampler: "k_euler_ancestral",
+              status: "done",
+              blobId: "b",
+              createdAt: 2,
+            },
+          ],
+        },
+      ],
+    });
+    const after = settleStuckImages(before);
+    assert.equal(after.messages[0].images[0].status, "error");
+    assert.equal(after.messages[0].images[0].error, "上次生图未完成");
+    assert.equal(after.messages[0].images[1].status, "done");
+    assert.equal(settleStuckImages(after), after);
+  });
+
+  it("maps abort to 已取消 / 生图超时", () => {
+    const ac = new AbortController();
+    ac.abort();
+    assert.equal(imageFailText(new Error("x"), ac.signal), "已取消");
+    const timeout = new Error("aborted");
+    timeout.name = "AbortError";
+    assert.equal(imageFailText(timeout), "生图超时");
+  });
+
+  it("shortens 429 json image errors", () => {
+    assert.equal(
+      prettyImageError('{"message":"Rate limit exceeded (20s interval)","statusCode":429}'),
+      "请求太频繁",
+    );
+    assert.equal(prettyImageError("还没连接 NAI 中转站"), "还没连接 NAI 中转站");
   });
 });

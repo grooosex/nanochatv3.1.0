@@ -7,13 +7,18 @@ import { imageUrl } from "@/lib/idb";
 import { fakePureChat, useApp } from "@/lib/store";
 import { promptPreview } from "@/lib/presets";
 import type { FavoriteItem, HistoryItem, ImageParams } from "@/lib/types";
-import { afterPaint, generateNai, genPhaseLabel } from "@/lib/engine";
+import { afterPaint, generateNai, genPhaseLabel, imageFailText } from "@/lib/engine";
 import { downloadBlob, randomSeed, uid, sortHistoryNewestFirst } from "@/lib/utils";
 import { ParamsPane } from "./ParamsPane";
 import { IconBtn, PrimaryBtn, TextInput, useCooldown } from "./ui-kit";
 
 const HOLD_MS = 400;
 let drawing = false;
+let drawAbort: AbortController | null = null;
+
+export function cancelPureDraw() {
+  drawAbort?.abort();
+}
 
 export function PurePane() {
   const history = useApp((s) => s.history);
@@ -138,11 +143,14 @@ export function PurePane() {
           className="flex-1"
           busy={Boolean(phase)}
           onClick={() => {
-            if (phase) return;
+            if (phase) {
+              cancelPureDraw();
+              return;
+            }
             void drawOne(setPhase);
           }}
         >
-          {phase ? genPhaseLabel(phase) : "绘一张"}
+          {phase ? "取消" : "绘一张"}
         </PrimaryBtn>
         <IconBtn
           className="text-on-stage"
@@ -576,6 +584,8 @@ async function drawOne(setPhase: (v: "uploading" | "generating" | "receiving" | 
   }
   if (drawing) return;
   drawing = true;
+  const ac = new AbortController();
+  drawAbort = ac;
   const seed = params.seedLocked && params.seed != null ? params.seed : randomSeed();
   setPhase("uploading");
   await afterPaint();
@@ -586,6 +596,7 @@ async function drawOne(setPhase: (v: "uploading" | "generating" | "receiving" | 
       seed,
       apiKey: settings.naiKey,
       baseUrl: settings.naiBase,
+      signal: ac.signal,
       onStart: () => setPhase("generating"),
       onReceiving: () => {
         useApp.getState().setCooldown(Date.now() + COOLDOWN_MS);
@@ -609,8 +620,9 @@ async function drawOne(setPhase: (v: "uploading" | "generating" | "receiving" | 
     };
     useApp.getState().addHistory(rec);
   } catch (e) {
-    useApp.getState().toast(e instanceof Error ? e.message : "生图失败");
+    useApp.getState().toast(imageFailText(e, ac.signal));
   } finally {
+    if (drawAbort === ac) drawAbort = null;
     drawing = false;
     setPhase(null);
   }

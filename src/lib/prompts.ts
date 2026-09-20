@@ -245,6 +245,40 @@ export const FIELD_SYSTEM = `你只改用户指定的那一个栏。其它栏是
 - 开场场景：地点、动作、气氛。大约 80–160 字。
 - 名字：一个中文名，不要解释。`;
 
+export const PERSONA_VOICE_RULES = `【人设·声部写法——覆盖普通人设字数】
+这栏要写成「短骨架 + 五声部语料」，不是形容词列表。目标大约 1200–2500 字。外貌不写。不要把说话方式栏整段抄进来。声部标题是正文的一部分，必须写。
+
+【骨架】先用几行立住：身份/底线、日常和压力下的反差、和「我」的关系、喜恶。具体可演，不要标签堆砌。没写关系时给不抢戏的默认，不擅自升级成恋人。
+
+【五声部】骨架之后按这个顺序写。语料是主体：每个场景小标题下两句带引号的原话；需要时才加一句括号动作。
+声部一·社会：对外。搭话、遇事、闲聊等，场景从这份人设的生活里长出来。
+声部二·内心：独处、受挫、触雷时她怎么想、怎么嘀咕。
+声部三·（自拟标题）：这个人最能被认出来的那一档。标题按她来（审美、中二、战斗、撒娇……）。禁止套用与本卡无关的审美辩论或中二破功。
+声部四·他者：两个有名字或身份的人在说她。夸里带一点不完美，不要全是路人吹捧。
+声部五·作者：第三人称点题，反差从哪来、演的时候别演歪。散文，不要对白。
+
+每块 2–3 个场景。场景名必须从这个人的生活里长出来。
+
+排版（只学格式，内容必须换成这个人）：
+声部一·社会
+向邻居借东西
+“一句符合她口吻的话。”
+“另一句。”`;
+
+export function voicePolishExtra(chat: Chat): string {
+  const marked = chat.characters
+    .map((c, i) => {
+      if (!c.personaVoices) return "";
+      if (!chat.isMulti) return "本卡唯一角色";
+      return `角色${i + 1}${c.name.trim() ? `「${c.name.trim()}」` : ""}`;
+    })
+    .filter(Boolean);
+  if (!marked.length) return "";
+  return `${PERSONA_VOICE_RULES}
+
+以上声部写法只用于这些人的 persona：${marked.join("、")}。其他人的 persona 仍按 180–400 字普通人设写。说话方式、总览、开场、外貌一律不要写成声部。`;
+}
+
 export const MEMORY_SYSTEM = `把更早的角色扮演对白压成一份「剧情备忘」。中文，第三人称，像给后任主持人看的场记。信息密度高，控制在 900–1400 字。
 保留：人名与称呼、关系变化、约定/承诺、关键事件时间线、地点、随身/现场道具、身体与衣物状态（含成人细节）、未完成的事、新暴露的性格或秘密。
 已经发生的性行为和重要身体接触必须记作经历和事实（例如曾经肛交过），不要因为动作结束就抹掉。不要把已结束的动作写成「正在做」（现在在客厅说话，就不要写成正趴着后入）。
@@ -265,7 +299,10 @@ export function systemFor(task: string, extra?: string, styleExtra?: string, ima
     return img ? `${withStyle}\n\n${img}` : withStyle;
   }
   if (task === "image") return extra ? `${IMAGE_SYSTEM}\n\n${extra}` : IMAGE_SYSTEM;
-  if (task === "polish") return style ? `${POLISH_SYSTEM}\n\n${style}` : POLISH_SYSTEM;
+  if (task === "polish") {
+    const core = extra ? `${POLISH_SYSTEM}\n\n${extra}` : POLISH_SYSTEM;
+    return style ? `${core}\n\n${style}` : core;
+  }
   if (task === "field") {
     const core = extra ? `${FIELD_SYSTEM}\n\n${extra}` : FIELD_SYSTEM;
     return style ? `${core}\n\n${style}` : core;
@@ -341,6 +378,7 @@ export function fieldPolishHint(opts: {
   instruction?: string;
   current: string;
   charLabel?: string;
+  voices?: boolean;
 }): string {
   const label = FIELD_LABELS[opts.field] || opts.field;
   const who = opts.charLabel
@@ -352,12 +390,19 @@ export function fieldPolishHint(opts: {
   const inst = opts.instruction?.trim()
     ? `用户对本栏的要求（最高优先，可以覆盖本栏旧字）：\n${opts.instruction.trim()}`
     : `这是刷新：依据本栏现有（若有）和其它栏，重写到可用浓度。`;
+  const voice =
+    opts.voices && opts.field === "persona"
+      ? `${PERSONA_VOICE_RULES}\n\n本栏覆盖上面的普通人设字数。只输出人设正文（骨架+五声部），不要 JSON，不要其它栏。`
+      : "";
   return [
     who,
     current,
     inst,
-    "只输出该栏正文。不要标题、不要解释、不要 JSON、不要其它栏。外貌栏只输出英文 NAI tag。",
-  ].join("\n\n");
+    voice,
+    "只输出该栏正文。不要解释、不要 JSON、不要其它栏。外貌栏只输出英文 NAI tag。声部标题若按声部写，算正文。",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 export function chatContextBlock(chat: Chat, opts?: { regen?: boolean }): string {
@@ -377,7 +422,7 @@ export function chatContextBlock(chat: Chat, opts?: { regen?: boolean }): string
     extras ? `【补丁】\n${extras}` : "",
     chat.memory ? `【长期记忆·既成事实】\n${chat.memory}` : "",
     chat.statusBarOn ? `【状态栏开启】每轮末尾输出，模板：\n${barText}` : "【状态栏关闭】",
-    opts?.regen ? "【重写】这是同一拍另写一条路。禁止套用上一稿的句子、段落结构和状态栏描述。" : "",
+    opts?.regen ? "【重写】这一拍当作第一次写。只根据人设、开场、记忆和到上一句为止的对话往下演。" : "",
     chat.isMulti
       ? `【多人】模式=${chat.multiMode === "group" ? "群聊（角色分头像各说，最后旁白）" : "同聊（一条里写所有在场角色）"}`
       : "",

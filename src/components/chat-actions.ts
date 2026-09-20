@@ -5,6 +5,7 @@ import {
   generateNai,
   groupFormatHint,
   historyMessages,
+  imageFailText,
   makeAssistantPlaceholder,
   makeImageRecord,
   makeUserMessage,
@@ -33,6 +34,11 @@ const busy = new Set<string>();
 const memoryEpoch = new Map<string, number>();
 const memoryBusy = new Set<string>();
 const memoryAborts = new Map<string, AbortController>();
+const imageAborts = new Map<string, AbortController>();
+
+function imageKey(chatId: string, msgId: string) {
+  return `${chatId}:${msgId}`;
+}
 
 function chat(id: string) {
   return useApp.getState().chats.find((c) => c.id === id);
@@ -69,6 +75,17 @@ export async function sendUser(id: string, text: string) {
 export function abortChat(id: string) {
   aborts.get(id)?.abort();
   aborts.delete(id);
+  for (const [k, ac] of imageAborts) {
+    if (k.startsWith(`${id}:`)) {
+      ac.abort();
+      imageAborts.delete(k);
+    }
+  }
+  invalidateMemory(id);
+}
+
+export function cancelImage(chatId: string, msgId: string) {
+  imageAborts.get(imageKey(chatId, msgId))?.abort();
 }
 
 export function invalidateMemory(id: string) {
@@ -358,6 +375,11 @@ export async function attachImage(
     return;
   }
 
+  const ac = new AbortController();
+  const key = imageKey(id, msgId);
+  imageAborts.get(key)?.abort();
+  imageAborts.set(key, ac);
+
   try {
     let grokTail = custom ? sanitizeNaiTags(custom, { stripForbidden: false }) : "";
     let charTails: Record<string, string> = {};
@@ -379,7 +401,14 @@ export async function attachImage(
         const live = chat(id) ?? c;
         const { shot, residual } = shotAndResidual(live.messages, msgId, shotText);
         const prevScene = previousRoundImagePrompt(live.messages, msgId);
-        const tags = await writeImageTags(live, residual, useApp.getState().settings.grokModelId, shot || msg.content, prevScene);
+        const tags = await writeImageTags(
+          live,
+          residual,
+          useApp.getState().settings.grokModelId,
+          shot || msg.content,
+          prevScene,
+          ac.signal,
+        );
         grokTail = tags.base;
         charTails = mapCharTails(live, tags.chars);
         applyAbsent(id, tags.absent);
@@ -399,6 +428,7 @@ export async function attachImage(
       seed: img.seed,
       apiKey: settings.naiKey,
       baseUrl: settings.naiBase,
+      signal: ac.signal,
       onStart: () => setImg({ status: "generating" }),
       onReceiving: () => {
         useApp.getState().setCooldown(Date.now() + COOLDOWN_MS);
@@ -416,7 +446,11 @@ export async function attachImage(
       }
     }
   } catch (e) {
-    setImg({ status: "error", error: e instanceof Error ? e.message : "生图失败" });
+    const err = imageFailText(e, ac.signal);
+    setImg({ status: "error", error: err });
+    if (err !== "已取消") useApp.getState().toast(err);
+  } finally {
+    if (imageAborts.get(key) === ac) imageAborts.delete(key);
   }
 }
 

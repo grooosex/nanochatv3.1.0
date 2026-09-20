@@ -48,6 +48,7 @@ export interface Character {
   speech: string;
   appearance: string;
   extras: ExtraField[];
+  personaVoices?: boolean;
   imageEnabled: boolean;
   prompt: string;
   uc: string;

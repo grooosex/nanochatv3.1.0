@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { unzipSync } from "fflate";
+import { IMAGE_GEN_TIMEOUT_MS } from "@/lib/constants";
 
 export const Route = createFileRoute("/api/nai")({
   server: {
@@ -44,6 +45,7 @@ export const Route = createFileRoute("/api/nai")({
               "Content-Type": "application/json",
             },
             body: JSON.stringify(body.payload ?? {}),
+            signal: AbortSignal.timeout(IMAGE_GEN_TIMEOUT_MS),
           });
           if (!r.ok) {
             const t = await r.text().catch(() => "");
@@ -76,9 +78,10 @@ export const Route = createFileRoute("/api/nai")({
           const b64 = btoa(binary);
           return Response.json({ ok: true, image: b64 });
         } catch (e) {
+          const abort = (e instanceof DOMException || e instanceof Error) && e.name === "AbortError";
           return Response.json({
             ok: false,
-            error: e instanceof Error ? e.message : "生图请求失败",
+            error: abort ? "生图超时" : e instanceof Error ? e.message : "生图请求失败",
           });
         }
       },

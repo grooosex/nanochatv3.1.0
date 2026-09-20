@@ -22,7 +22,7 @@ import { memoryCaughtUp } from "@/lib/chat-memory";
 import { splitDialogue, stripSpeakerPrefix } from "@/lib/rp-text";
 import { parseReplyMarkup, type ReplyFold } from "@/lib/reply-markup";
 import type { Chat, ChatMessage, GenImage, ImageGenSource, MultiMode, PromptInsertMode } from "@/lib/types";
-import { attachImage, branchFrom, cancelMemory, editMessage, regenMessage, retryMemory, sendUser } from "./chat-actions";
+import { attachImage, branchFrom, cancelImage, cancelMemory, editMessage, regenMessage, retryMemory, sendUser } from "./chat-actions";
 import { ChatModelSelect } from "./ModelSelect";
 import { ChatAvatar, ExpandSelect, Modal, TextArea, useCooldown } from "./ui-kit";
 
@@ -496,6 +496,8 @@ function ImageBlock({ chat, msg, allowEmpty }: { chat: Chat; msg: ChatMessage; a
   const [url, setUrl] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [kick, setKick] = useState<ImageGenSource | null>(null);
+  const [flashErr, setFlashErr] = useState<string | null>(null);
+  const seenFail = useRef("");
   const current: GenImage | undefined = done[idx] ?? done[done.length - 1];
   const busy = kick ?? pendingImg?.source ?? null;
   const locked = pending || Boolean(kick) || !chatImage;
@@ -536,10 +538,23 @@ function ImageBlock({ chat, msg, allowEmpty }: { chat: Chat; msg: ChatMessage; a
     });
   };
 
-  const lastError = [...msg.images].reverse().find((g) => g.status === "error");
+  const latest = msg.images.at(-1);
+  const lastError = latest?.status === "error" ? latest : undefined;
   const phaseLabel =
     genPhaseLabel(pendingImg?.status) ||
     (kick === "rewrite" || kick === "auto" ? "写提示词中" : kick ? "上传中" : "");
+
+  useEffect(() => {
+    if (pending || !lastError || !current?.blobId) {
+      if (!lastError) setFlashErr(null);
+      return;
+    }
+    if (seenFail.current === lastError.id) return;
+    seenFail.current = lastError.id;
+    setFlashErr(genPhaseLabel("error", lastError.error));
+    const t = window.setTimeout(() => setFlashErr(null), 2000);
+    return () => window.clearTimeout(t);
+  }, [pending, lastError, current?.blobId]);
 
   if (msg.images.length === 0 && !allowEmpty) return null;
 
@@ -585,8 +600,13 @@ function ImageBlock({ chat, msg, allowEmpty }: { chat: Chat; msg: ChatMessage; a
             style={{ aspectRatio: `${chat.imageParams.width} / ${chat.imageParams.height}` }}
           >
             {pending ? (
-              <span className="flex items-center gap-2">
-                <Loader2 className="size-4 animate-spin" /> {phaseLabel || "准备中"}
+              <span className="flex items-center gap-3">
+                <span className="flex items-center gap-2">
+                  <Loader2 className="size-4 animate-spin" /> {phaseLabel || "准备中"}
+                </span>
+                <button type="button" className="text-primary" onClick={() => cancelImage(chat.id, msg.id)}>
+                  取消
+                </button>
               </span>
             ) : lastError ? (
               <span className="text-center text-danger">{genPhaseLabel("error", lastError.error)}</span>
@@ -596,6 +616,9 @@ function ImageBlock({ chat, msg, allowEmpty }: { chat: Chat; msg: ChatMessage; a
           </div>
         )}
       </div>
+      {flashErr ? (
+        <div className="mt-1 truncate text-center text-[11px] leading-4 text-danger">{flashErr}</div>
+      ) : null}
       <div className="mt-2 grid grid-cols-4 text-[12px] text-muted">
         <IcoBtn
           icon={<RefreshCw className="size-4" />}
@@ -603,6 +626,10 @@ function ImageBlock({ chat, msg, allowEmpty }: { chat: Chat; msg: ChatMessage; a
           busy={busy === "same"}
           disabled={locked || !current}
           onClick={() => {
+            if (busy === "same") {
+              cancelImage(chat.id, msg.id);
+              return;
+            }
             if (locked || !current) return;
             setKick("same");
             void attachImage(chat.id, msg.id, "same");
@@ -610,10 +637,14 @@ function ImageBlock({ chat, msg, allowEmpty }: { chat: Chat; msg: ChatMessage; a
         />
         <IcoBtn
           icon={<Sparkles className="size-4" />}
-          label={busy === "rewrite" && phaseLabel ? phaseLabel : "换提示词生成"}
-          busy={busy === "rewrite"}
+          label={(busy === "rewrite" || busy === "auto") && phaseLabel ? phaseLabel : "换提示词生成"}
+          busy={busy === "rewrite" || busy === "auto"}
           disabled={locked}
           onClick={() => {
+            if (busy === "rewrite" || busy === "auto") {
+              cancelImage(chat.id, msg.id);
+              return;
+            }
             if (locked) return;
             setKick("rewrite");
             void attachImage(chat.id, msg.id, "rewrite");
@@ -639,6 +670,10 @@ function ImageBlock({ chat, msg, allowEmpty }: { chat: Chat; msg: ChatMessage; a
           busy={busy === "custom"}
           disabled={locked || !current}
           onClick={() => {
+            if (busy === "custom") {
+              cancelImage(chat.id, msg.id);
+              return;
+            }
             if (!current || locked) return;
             useApp.getState().setUI({
               customPrompt: {
@@ -673,7 +708,7 @@ function IcoBtn({
     <button
       type="button"
       onClick={onClick}
-      disabled={disabled}
+      disabled={busy ? false : disabled}
       aria-busy={busy || undefined}
       aria-label={label}
       className={

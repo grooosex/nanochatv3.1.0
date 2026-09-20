@@ -26,6 +26,7 @@ import type {
 import { normalizeChatMemory } from "./chat-memory";
 import { uid, sortHistoryNewestFirst } from "./utils";
 import { migrateFavorite, presetNameFrom } from "./presets";
+import { settleStuckImages } from "./image-status";
 
 type Toast = { id: number; text: string };
 
@@ -186,12 +187,17 @@ export const useApp = create<State>((set, get) => ({
       db.kv.get("currentId"),
       db.kv.get("composerDrafts"),
     ]);
-    const live = data.chats.filter((c) => !c.isDraft).map((c) => ({
-      ...normalizeChatMemory(c),
-      grokModelId: migrateGrokId(c.grokModelId),
-      imageModelId: c.imageModelId || null,
-      imageModelPin: c.imageModelPin || null,
-    }));
+    const live = data.chats.filter((c) => !c.isDraft).map((c) => {
+      const mapped = {
+        ...normalizeChatMemory(c),
+        grokModelId: migrateGrokId(c.grokModelId),
+        imageModelId: c.imageModelId || null,
+        imageModelPin: c.imageModelPin || null,
+      };
+      const next = settleStuckImages(mapped);
+      if (next !== mapped) persistChat(next);
+      return next;
+    });
     const settings = {
       ...data.settings,
       grokModelId: migrateGrokId(data.settings.grokModelId),

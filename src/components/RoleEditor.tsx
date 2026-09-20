@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import { ChevronDown, ChevronUp, Check, Download, Loader2, Plus, RefreshCw, Sparkles, Trash2, X } from "lucide-react";
 import { DEFAULT_STATUS_BAR, PLACEHOLDERS, emptyCharacter } from "@/lib/constants";
 import { polishAll, polishField, foldWindow } from "@/lib/engine";
@@ -83,7 +83,15 @@ export function RoleEditor({ chat, mode }: { chat: Chat; mode: "create" | "edit"
     setBusy({ kind: "field", key, charId });
     try {
       const snapshot = useApp.getState().chats.find((c) => c.id === chat.id) ?? chat;
-      const text = await polishField(snapshot, grok, key, instruction, charId);
+      const text = await polishField(snapshot, grok, key, instruction, charId, (t) => {
+        if (key !== "persona") return;
+        const ch = snapshot.characters.find((c) => c.id === charId);
+        if (!ch?.personaVoices) return;
+        useApp.getState().patchChat(chat.id, (c) => ({
+          ...applyRoleField(c, key, t, charId),
+          updatedAt: Date.now(),
+        }));
+      });
       useApp.getState().patchChat(chat.id, (c) => ({
         ...applyRoleField(c, key, text, charId),
         updatedAt: Date.now(),
@@ -285,6 +293,27 @@ export function RoleEditor({ chat, mode }: { chat: Chat; mode: "create" | "edit"
             placeholder={PLACEHOLDERS.persona}
             busy={busy?.kind === "field" && busy.key === "persona" && busy.charId === char.id}
             locked={locked}
+            grow={Boolean(char.personaVoices)}
+            titleExtra={
+              <button
+                type="button"
+                className={`rounded-full border px-2 py-0.5 text-[11px] leading-none transition ${
+                  char.personaVoices
+                    ? "border-primary bg-primary text-on-primary"
+                    : "border-primary bg-transparent text-primary"
+                }`}
+                disabled={locked}
+                onClick={() =>
+                  patch({
+                    characters: chat.characters.map((c) =>
+                      c.id === char.id ? { ...c, personaVoices: !c.personaVoices } : c,
+                    ),
+                  })
+                }
+              >
+                声部
+              </button>
+            }
             onChange={(v) =>
               patch({ characters: chat.characters.map((c) => (c.id === char.id ? { ...c, persona: v } : c)) })
             }
@@ -586,6 +615,8 @@ function FieldBlock({
   busy,
   locked,
   single,
+  titleExtra,
+  grow,
 }: {
   label: string;
   hint?: string;
@@ -597,6 +628,8 @@ function FieldBlock({
   busy?: boolean;
   locked?: boolean;
   single?: boolean;
+  titleExtra?: ReactNode;
+  grow?: boolean;
 }) {
   return (
     <Card className="mb-3">
@@ -623,7 +656,10 @@ function FieldBlock({
           </span>
         }
       >
-        {label}
+        <span className="inline-flex items-center gap-1.5">
+          {label}
+          {titleExtra}
+        </span>
       </FieldLabel>
       {single ? (
         <TextInput value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
@@ -631,8 +667,8 @@ function FieldBlock({
         <TextArea
           value={value}
           placeholder={placeholder}
-          rows={5}
-          className="min-h-[calc(1.5rem+5*1.625em)]"
+          rows={grow ? 12 : 5}
+          className={grow ? "min-h-[calc(1.5rem+12*1.625em)]" : "min-h-[calc(1.5rem+5*1.625em)]"}
           onChange={(e) => onChange(e.target.value)}
         />
       )}

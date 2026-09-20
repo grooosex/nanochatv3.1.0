@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Menu, SlidersHorizontal } from "lucide-react";
 import { emptyCharacter } from "@/lib/constants";
 import { loadTags } from "@/lib/tags";
-import { useApp } from "@/lib/store";
+import { listedChats, useApp } from "@/lib/store";
 import { FIELD_LABELS } from "@/lib/prompts";
 import { DEFAULT_STATUS_BAR, defaultImageParams } from "@/lib/constants";
 import type { Chat, MultiMode } from "@/lib/types";
@@ -216,7 +216,9 @@ function FieldEditModal() {
 function MoveModal() {
   const open = useApp((s) => s.ui.moveOpen);
   const folders = useApp((s) => s.folders);
+  const chats = useApp((s) => s.chats);
   if (!open) return null;
+  const { foldersSorted } = listedChats(folders, chats);
   return (
     <Modal open onClose={() => useApp.getState().setUI({ moveOpen: false })} title="移动到">
       <button
@@ -225,7 +227,7 @@ function MoveModal() {
       >
         不放进文件夹
       </button>
-      {folders.map((f) => (
+      {foldersSorted.map((f) => (
         <button
           key={f.id}
           className="mb-2 w-full rounded-2xl bg-card px-4 py-3 text-left"

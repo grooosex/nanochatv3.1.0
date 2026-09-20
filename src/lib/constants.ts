@@ -195,6 +195,7 @@ export function emptyCharacter(index = 1): import("./types").Character {
     speech: "",
     appearance: "",
     extras: [],
+    personaVoices: false,
     imageEnabled: true,
     prompt: "",
     uc: "",
@@ -214,3 +215,4 @@ export const PLACEHOLDERS = {
 
 export const COOLDOWN_MS = 20_000;
 export const RECENT_TURNS = 20;
+export const IMAGE_GEN_TIMEOUT_MS = 120_000;

@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  CONTINUE_USER,
   OPENING_USER,
   formatUserForChat,
   formatUserForImage,
@@ -41,6 +42,13 @@ describe("formatUserForChat", () => {
 
   it("leaves the opening cue alone", () => {
     assert.equal(formatUserForChat(OPENING_USER), OPENING_USER);
+  });
+
+  it("turns blank sends into a continue cue", () => {
+    assert.equal(formatUserForChat(""), CONTINUE_USER);
+    assert.equal(formatUserForChat("   "), CONTINUE_USER);
+    assert.match(CONTINUE_USER, /没有发言/);
+    assert.doesNotMatch(CONTINUE_USER, /不能替/);
   });
 
   it("labels facts and forbids hearing them as orders", () => {

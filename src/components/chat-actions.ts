@@ -66,7 +66,6 @@ export async function sendOpening(id: string) {
 
 export async function sendUser(id: string, text: string) {
   const t = text.trim();
-  if (!t) return;
   abortChat(id);
   patch(id, (c) => ({ ...c, messages: [...c.messages, makeUserMessage(t)] }));
   await runReply(id, t, false);
@@ -635,10 +634,10 @@ export async function editMessage(id: string, msgId: string, text: string) {
     bumpMemoryEpoch(id);
     patch(id, (ch) => ({
       ...ch,
-      messages: [...ch.messages.slice(0, idx), { ...msg, content: text }],
+      messages: [...ch.messages.slice(0, idx), { ...msg, content: text.trim() }],
       ...applySnaps(rewindSnaps(ch.memorySnaps, idx)),
     }));
-    await runReply(id, text, false);
+    await runReply(id, text.trim(), false);
   } else {
     patch(id, (ch) => ({
       ...ch,

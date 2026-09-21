@@ -63,7 +63,6 @@ interface UI {
   paramsJump: string | null;
   llmSettings: boolean;
   memoryHint: { chatId: string; state: "generating" | "ok" | "fail"; error?: string; draft?: string } | null;
-  imageTrayOffer: { chatId: string; msgId: string } | null;
   editUserMsg: { chatId: string; msgId: string; backup: string } | null;
 }
 
@@ -153,7 +152,6 @@ const ui0 = (): UI => ({
   paramsJump: null,
   llmSettings: false,
   memoryHint: null,
-  imageTrayOffer: null,
   editUserMsg: null,
 });
 

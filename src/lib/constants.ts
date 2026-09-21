@@ -62,16 +62,16 @@ export const NAI_MODELS: {
   wire?: string;
   furry?: boolean;
 }[] = [
+  { id: "nai-diffusion-5-full", label: "NAI V5 Full", family: "v5" },
+  { id: "nai-diffusion-5-curated", label: "NAI V5 Curated", family: "v5" },
   { id: "nai-diffusion-4-5-full", label: "NAI V4.5 Full", family: "v4.5" },
   { id: "nai-diffusion-4-5-furry", label: "NAI V4.5 Furry", family: "v4.5", wire: "nai-diffusion-4-5-full", furry: true },
+  { id: "nai-diffusion-4-5-curated", label: "NAI V4.5 Curated", family: "v4.5" },
   { id: "nai-diffusion-4-full", label: "NAI V4 Full", family: "v4" },
   { id: "nai-diffusion-4-furry", label: "NAI V4 Furry", family: "v4", wire: "nai-diffusion-4-full", furry: true },
   { id: "nai-diffusion-4-curated", label: "NAI V4 Curated", family: "v4", wire: "nai-diffusion-4-curated-preview" },
   { id: "nai-diffusion-3", label: "NAI V3", family: "v3" },
   { id: "nai-diffusion-furry-3", label: "NAI Furry V3", family: "v3", furry: true },
-  { id: "nai-diffusion-5-full", label: "NAI V5 Full", family: "v5" },
-  { id: "nai-diffusion-5-curated", label: "NAI V5 Curated", family: "v5" },
-  { id: "nai-diffusion-4-5-curated", label: "NAI V4.5 Curated", family: "v4.5" },
 ];
 
 export const SAMPLERS: { id: SamplerId; label: string }[] = [

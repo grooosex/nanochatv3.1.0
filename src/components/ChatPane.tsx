@@ -31,7 +31,6 @@ export function ChatPane({ chat }: { chat: Chat }) {
   const left = useCooldown(cooldownUntil);
   const chatImage = useApp((s) => s.settings.chatImage !== false);
   const memoryHint = useApp((s) => s.ui.memoryHint);
-  const imageTrayOffer = useApp((s) => s.ui.imageTrayOffer);
   const editUser = useApp((s) => (s.ui.editUserMsg?.chatId === chat.id ? s.ui.editUserMsg : null));
   const scroller = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -85,7 +84,6 @@ export function ChatPane({ chat }: { chat: Chat }) {
   };
 
   const portrait = chat.imageParams.height >= chat.imageParams.width;
-  const lastAssistId = [...chat.messages].reverse().find((m) => m.role !== "user")?.id;
   const { W, I } = foldWindow();
   const memOk = memoryCaughtUp(chat.messages.length, chat.memoryUntil || 0, W, I);
   const memMine = memoryHint?.chatId === chat.id;
@@ -143,9 +141,7 @@ export function ChatPane({ chat }: { chat: Chat }) {
             key={m.id}
             chat={chat}
             msg={m}
-            showImageTray={
-              Boolean(imageTrayOffer && imageTrayOffer.chatId === chat.id && imageTrayOffer.msgId === m.id && lastAssistId === m.id)
-            }
+            showImageTray={chatImage && m.role !== "user"}
             onUseOption={(t) => {
               useApp.getState().setComposerDraft(chat.id, t);
               requestAnimationFrame(() => inputRef.current?.focus());
@@ -315,7 +311,7 @@ function Bubble({
       <div className="mb-4 flex flex-col items-end">
         <div
           className={cn(
-            "w-fit max-w-[85%] rounded-[18px] border px-4 py-2.5",
+            "w-fit min-h-[2.75rem] min-w-[5.5rem] max-w-[85%] rounded-[18px] border px-4 py-2.5",
             editingUser ? "border-primary bg-card" : "border-line bg-card",
           )}
         >
@@ -557,6 +553,7 @@ function ImageBlock({ chat, msg, allowEmpty }: { chat: Chat; msg: ChatMessage; a
   }, [pending, lastError, current?.blobId]);
 
   if (msg.images.length === 0 && !allowEmpty) return null;
+  const showFrame = msg.images.length > 0 || pending;
 
   return (
     <div className="mt-3">
@@ -583,6 +580,7 @@ function ImageBlock({ chat, msg, allowEmpty }: { chat: Chat; msg: ChatMessage; a
           )}
         </div>
       )}
+      {showFrame ? (
       <div className="relative overflow-hidden rounded-[18px] bg-dim">
         {current && url ? (
           <div className="relative">
@@ -616,6 +614,7 @@ function ImageBlock({ chat, msg, allowEmpty }: { chat: Chat; msg: ChatMessage; a
           </div>
         )}
       </div>
+      ) : null}
       {flashErr ? (
         <div className="mt-1 truncate text-center text-[11px] leading-4 text-danger">{flashErr}</div>
       ) : null}

@@ -1,6 +1,8 @@
 import { replyContextText, replyStoryText } from "./reply-markup.ts";
 
 export const OPENING_USER = "（开始场景，请角色先开口）";
+export const CONTINUE_USER =
+  "用户这轮没有发言。这不是开场，也不是结束。接着上一拍已经发生的事往下演，把场上未完的动作、对话、时间往前推，不要空等用户开口，不要问「你想做什么」。需要用户开口或表态时你可以代写或给出选项。不要复述上一拍，不要跳到无关的新故事。";
 
 export type UserMarkup = {
   facts: string[];
@@ -44,7 +46,8 @@ export function needsMarkupFormat(raw: string): boolean {
 
 export function formatUserForChat(raw: string): string {
   const t = (raw || "").trim();
-  if (!t || t === OPENING_USER || !needsMarkupFormat(t)) return raw;
+  if (!t) return CONTINUE_USER;
+  if (t === OPENING_USER || !needsMarkupFormat(t)) return raw;
   const p = parseUserMarkup(t);
   const parts: string[] = [];
   if (p.facts.length) {

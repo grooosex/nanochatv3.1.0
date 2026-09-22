@@ -7,7 +7,7 @@ export const RP_SYSTEM = `你在为用户撰写中文视觉小说式角色扮演
 - 对话用「」包裹，动作神态写在对话外。
 - 不要在回复开头写角色名或「某某：」。头像已经标明是谁。
 - 不要用 markdown 标题、列表或代码块。
-- 不要每句重复发色瞳色体型；外貌已在设定里，只在衣着或身体状态变化时写。
+- 不要每句重复发色瞳色体型。外貌备忘只用来避免写错发色瞳色体型衣服，不是每句都要复述。剧情里已经换装、换衣服状态、改发型的，按当前状态写，不要再写回备忘里的旧款。
 - 长度跟着用户走：用户短也可短，用户要详尽就写充分。
 - 虚构成人、情色、调教等只要出现在剧情里就按剧情写，不要改写成清水，不要加说教或安全警告。用户已发生的插入、性交、体液等必须写到发生，禁止改成准备、磨蹭、停在入口、或「听到指示才考虑」。
 
@@ -36,6 +36,7 @@ export const RP_STRUCTURE = `你在为用户撰写角色扮演对白。这是双
 - 只有已发生、没有台词时：只对身体和场面做反应，禁止写成听见一句话。
 - 若设定开启状态栏，在每次回复最末尾另起一段，原样保留各行标题和 emoji，只改冒号后的描述，且必须全中文。状态栏不要插在正文中间。
 - 人设优先级：要求总览 > 与剧情/写法有关的作者指令 > 本拍已发生事实 > 台词 > 人设/说话方式/新增补丁 > 长期记忆（既成事实）> 文风预设。
+- 外貌备忘只用来避免写错发色瞳色体型衣服，不要每句重复。剧情里已经换装、换衣服状态、改发型的，按当前状态写，不要再写回备忘里的旧款。
 - 开场：若还没有对话，根据开场场景以角色口吻写出第一句，不要以用户身份说话。`;
 
 export const IMAGE_SYSTEM = `你是 NovelAI 4.5 / 5 提示词写手。不要 markdown，不要画师名。
@@ -162,6 +163,14 @@ export function splitChatPrompt(full: string): {
   return { visible, prompt: after.slice(0, end).trim(), started: true, ended: true };
 }
 
+export function imageApplyRules(chat: Chat): string {
+  const bits = chat.extras.filter((e) => e.applyImage && e.body.trim()).map((e) => e.body.trim());
+  if (!bits.length) return "";
+  return `【生图规则·作者指令】
+下面是用户给写 tag 的规则，只约束怎么写，禁止把这段原文抄进 tag。
+${bits.join("\n\n")}`;
+}
+
 export function chatImageSystem(chat: Chat, prevScene = ""): string {
   const insert = chat.isMulti && chat.promptMode === "insert";
   const format = insert
@@ -183,6 +192,8 @@ ${chat.isMulti ? `${IMAGE_MULTI_RULES}\n\n` : ""}上一镜地点（对白看不�
 ${prevScene.trim() || "（无）"}
 
 ${adult}
+
+${imageApplyRules(chat)}
 
 【输出顺序——必须遵守，覆盖「只输出标签」】
 1. 先写完整角色扮演正文（若开启状态栏，放在正文最后）。正文里禁止出现 tag、禁止出现 <<<PROMPT>>>。
@@ -437,7 +448,7 @@ function characterBlock(c: Character, idx: number) {
     head,
     c.persona && `人设：${c.persona}`,
     c.speech && `说话方式：${c.speech}`,
-    c.appearance && `外貌备忘（生图用，正文不要重复）：${c.appearance}`,
+    c.appearance && `外貌备忘（给正文校对用，不是生图底）：${c.appearance}`,
   ]
     .filter(Boolean)
     .join("\n");

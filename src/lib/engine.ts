@@ -1,5 +1,5 @@
 import { grokOnce, grokStream } from "./grok-client";
-import { chatContextBlock, fieldPolishHint, groupFormatHint, IMAGE_BG_RULES, IMAGE_MULTI_RULES, IMAGE_SHOT_RULES, roleSnapshot, splitChatPrompt, statusBarFor, voicePolishExtra } from "./prompts";
+import { chatContextBlock, fieldPolishHint, groupFormatHint, IMAGE_BG_RULES, IMAGE_MULTI_RULES, IMAGE_SHOT_RULES, imageApplyRules, roleSnapshot, splitChatPrompt, statusBarFor, voicePolishExtra } from "./prompts";
 import { buildPolishUserContent, extractFieldText, parsePolishJson, stripRoleOutput } from "./role-polish";
 import { formatUserForChat } from "./user-markup";
 import { stripSpeakerPrefix } from "./rp-text";
@@ -243,6 +243,7 @@ export async function writeImageTags(
       ? "成人提示词加强：开。这是最高优先级之一。对白里的动作、部位、体液必须写成具体真 tag，写透（22–40 个），不要收成 ass focus / naughty face。无关内容仍不要加。只输出标签，不要解释。"
       : "成人提示词加强：关。对白里看得见的仍写具体真 tag，不要额外堆没写到的器官特写。完全没有性/血腥的场面不要加 nsfw。只输出标签，不要解释。",
     chat.isMulti ? IMAGE_MULTI_RULES : "",
+    imageApplyRules(chat),
   ]
     .filter(Boolean)
     .join("\n\n");

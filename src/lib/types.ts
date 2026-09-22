@@ -39,6 +39,7 @@ export type PromptInsertMode = "insert" | "legacy";
 export interface ExtraField {
   id: string;
   body: string;
+  applyImage?: boolean;
 }
 
 export interface Character {

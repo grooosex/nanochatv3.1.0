@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { splitChatPrompt, chatImageSystem, IMAGE_SYSTEM, IMAGE_SHOT_RULES, IMAGE_BG_RULES, IMAGE_MULTI_RULES, PERSONA_VOICE_RULES, fieldPolishHint, voicePolishExtra, systemFor, statusBarSkeleton, chatContextBlock } from "./prompts.ts";
+import { splitChatPrompt, chatImageSystem, IMAGE_SYSTEM, IMAGE_SHOT_RULES, IMAGE_BG_RULES, IMAGE_MULTI_RULES, PERSONA_VOICE_RULES, fieldPolishHint, voicePolishExtra, systemFor, statusBarSkeleton, chatContextBlock, imageApplyRules } from "./prompts.ts";
 import { settleStuckImages, imageFailText, prettyImageError } from "./image-status.ts";
 import { emptyCharacter, defaultImageParams } from "./constants.ts";
 import type { Chat } from "./types.ts";
@@ -95,6 +95,30 @@ describe("chatImageSystem", () => {
   it("tells the model whether adult boost is on", () => {
     assert.match(chatImageSystem(stub({ adultBoost: true })), /【成人提示词加强】开/);
     assert.match(chatImageSystem(stub({ adultBoost: false })), /【成人提示词加强】关/);
+  });
+
+  it("only forwards extras marked 应用到生图 as writer rules", () => {
+    const chat = stub({
+      extras: [
+        { id: "a", body: "不要画眼镜", applyImage: true },
+        { id: "b", body: "这段只给聊天", applyImage: false },
+      ],
+    });
+    const rules = imageApplyRules(chat);
+    assert.match(rules, /不要画眼镜/);
+    assert.match(rules, /禁止把这段原文抄进 tag/);
+    assert.doesNotMatch(rules, /这段只给聊天/);
+    assert.match(chatImageSystem(chat), /不要画眼镜/);
+    assert.equal(imageApplyRules(stub({ extras: [{ id: "a", body: "x" }] })), "");
+  });
+
+  it("labels appearance as chat proofreading, not an image base", () => {
+    const block = chatContextBlock(
+      stub({ characters: [{ ...emptyCharacter(1), appearance: "pink hair, sailor" }] }),
+    );
+    assert.match(block, /给正文校对用，不是生图底/);
+    assert.doesNotMatch(block, /生图用/);
+    assert.match(block, /pink hair/);
   });
 
   it("keeps 本镜/背景 for everyone, and only hangs 互动 rules on multi chats", () => {

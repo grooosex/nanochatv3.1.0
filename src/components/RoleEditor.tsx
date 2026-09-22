@@ -681,11 +681,26 @@ function Extras({ extras, onChange }: { extras: ExtraField[]; onChange: (e: Extr
     <div className="mb-3">
       {extras.map((e, i) => (
         <Card key={e.id} className="mb-2">
-          <div className="mb-1 flex items-center justify-between">
+          <div className="mb-1 flex items-center justify-between gap-2">
             <div className="text-[13px] font-medium">新增{i + 1}</div>
-            <button className="text-danger" onClick={() => onChange(extras.filter((x) => x.id !== e.id))}>
-              <Trash2 className="size-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className={`rounded-full border px-2 py-0.5 text-[11px] leading-none transition ${
+                  e.applyImage
+                    ? "border-primary bg-primary text-on-primary"
+                    : "border-primary bg-transparent text-primary"
+                }`}
+                onClick={() =>
+                  onChange(extras.map((x) => (x.id === e.id ? { ...x, applyImage: !x.applyImage } : x)))
+                }
+              >
+                应用到生图
+              </button>
+              <button className="text-danger" onClick={() => onChange(extras.filter((x) => x.id !== e.id))}>
+                <Trash2 className="size-4" />
+              </button>
+            </div>
           </div>
           <TextArea
             value={e.body}

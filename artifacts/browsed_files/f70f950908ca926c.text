@@ -1,0 +1,1205 @@
+import { create } from "zustand";
+import { persist, createJSONStorage, type StateStorage } from "zustand/middleware";
+import { showToast } from "./toast";
+import { kvDel, kvGet, kvSet } from "./idb";
+import {
+  mergeCardLists,
+  readAppearanceCards,
+  readPersonaCards,
+  writeAppearanceCards,
+  writePersonaCards,
+} from "./card-persist";
+import {
+  folderParent,
+  hydrateLayout,
+  isFolderDescendant,
+  nextSortTop,
+  nextSortOrdinary,
+} from "./tree";
+import { readNaiBackup, writeNaiBackup, pickConn, readPersistStoreConn } from "./nai-conn";
+import { memoryAfterTruncate } from "./chat-memory";
+import {
+  cloneImageParams,
+  defaultDraft,
+  defaultImageParams,
+  defaultPureParams,
+  defaultStatusText,
+  extraTitle,
+  makeRole,
+  cloneDraft,
+  renumberExtras,
+  uid,
+} from "./defaults";
+import {
+  displayNameFromDraft,
+  emptyCastMember,
+  isMultiDraft,
+  memberFromRole,
+  normalizeDraft,
+  CAST_MAX,
+  syncCharactersToCount,
+} from "./cast";
+import type {
+  AppSettings,
+  ChatMessage,
+  Folder,
+  GrokModelId,
+  ImageParams,
+  PersonaCard,
+  AppearanceCard,
+  PureHistoryItem,
+  PurePreset,
+  Role,
+  RoleDraft,
+  TabId,
+  ParamsFocusField,
+} from "./types";
+
+interface AppState {
+  hydrated: boolean;
+  settings: AppSettings;
+  folders: Folder[];
+  roles: Role[];
+  activeRoleId: string | null;
+  tab: TabId;
+  composer: "chat" | "new" | "edit" | "assemble";
+  editingRoleId: string | null;
+  draftRoleId: string | null;
+  assembleSourceIds: string[];
+  sidebarOpen: boolean;
+  selectMode: boolean;
+  selectedIds: string[];
+  expandedFolderIds: string[];
+  pureParams: ImageParams;
+  pureHistory: PureHistoryItem[];
+  pureCurrentId: string | null;
+  purePresets: PurePreset[];
+  personaCards: PersonaCard[];
+  appearanceCards: AppearanceCard[];
+  paramsFocus: ParamsFocusField | null;
+  draftBusy: boolean;
+  draftBusyKey: string | null;
+  setHydrated: (v: boolean) => void;
+  setTab: (t: TabId) => void;
+  setSidebar: (v: boolean) => void;
+  setTheme: (t: "light" | "dark") => void;
+  setGrokModel: (m: GrokModelId) => void;
+  setConnection: (naiKey: string, naiBase: string) => void;
+  openNewRole: () => void;
+  openAssembleMulti: (roleIds: string[]) => void;
+  cancelComposer: () => void;
+  beginChat: () => string | null;
+  createRole: (draft: RoleDraft, params?: ImageParams) => string;
+  updateRoleDraft: (id: string, draft: RoleDraft) => void;
+  updateRoleParams: (id: string, params: ImageParams) => void;
+  applyParamsFrom: (fromId: string) => void;
+  setActiveRole: (id: string | null) => void;
+  patchRole: (id: string, patch: Partial<Role>) => void;
+  renameRole: (id: string, name: string) => void;
+  setNote: (id: string, note: string) => void;
+  deleteRoles: (ids: string[]) => void;
+  addFolder: (name?: string) => string;
+  renameFolder: (id: string, name: string) => void;
+  deleteFolders: (ids: string[]) => void;
+  toggleStar: (ids: string[]) => void;
+  moveToFolder: (ids: string[], folderId: string | null) => void;
+  duplicateItems: (ids: string[]) => void;
+  enterSelect: (id: string) => void;
+  toggleSelected: (id: string) => void;
+  selectAll: () => void;
+  exitSelect: () => void;
+  toggleFolder: (id: string) => void;
+  appendMessage: (roleId: string, msg: Role["messages"][number]) => void;
+  patchMessage: (roleId: string, msgId: string, patch: Partial<ChatMessage>) => void;
+  truncateFrom: (roleId: string, msgId: string, inclusive: boolean) => Role["messages"];
+  replaceMessages: (roleId: string, messages: Role["messages"]) => void;
+  branchFrom: (roleId: string, msgId: string) => string;
+  setPureParams: (p: ImageParams) => void;
+  addPureHistory: (item: PureHistoryItem) => void;
+  patchPureHistory: (id: string, patch: Partial<PureHistoryItem>) => void;
+  removePureHistory: (id: string) => void;
+  setPureCurrent: (id: string | null) => void;
+  addPurePreset: (item: PurePreset) => void;
+  patchPurePreset: (id: string, patch: Partial<PurePreset>) => void;
+  deletePurePreset: (id: string) => void;
+  savePersonaCard: (draft: RoleDraft) => void;
+  deletePersonaCard: (id: string) => void;
+  saveAppearanceCard: (name: string, prompt: string) => void;
+  deleteAppearanceCard: (id: string) => void;
+  reorderAppearanceCards: (orderedIds: string[]) => void;
+  reorderPersonaCards: (orderedIds: string[]) => void;
+  applySidebarLayout: (folders: Folder[], roles: Role[]) => void;
+  applyAppearanceToActive: (prompt: string) => void;
+  applyAppearanceToChar: (index: number, prompt: string, roleId?: string) => void;
+  copyCharPromptToAppearance: (index: number, roleId?: string) => void;
+  setParamsFocus: (f: ParamsFocusField | null) => void;
+  focusParams: (field: ParamsFocusField, seed?: string | number) => void;
+  setDraftBusy: (v: boolean, key?: string | null) => void;
+}
+
+const emptySettings = (): AppSettings => ({
+	grokModel: "grok-4.5",
+	theme: "light",
+	connection: pickConn(readNaiBackup(), readPersistStoreConn())
+});
+function sortFolders(folders: Folder[]) {
+	return [...folders].sort((a, b) => {
+		if (a.starred !== b.starred) return a.starred ? -1 : 1;
+		return b.createdAt - a.createdAt;
+	});
+}
+function sortRoles(roles: Role[]) {
+	return [...roles].sort((a, b) => {
+		if (a.starred !== b.starred) return a.starred ? -1 : 1;
+		return b.updatedAt - a.updatedAt;
+	});
+}
+function copyName(name: string) {
+	return `${name}(副本)`;
+}
+function cloneMessage(m: ChatMessage) {
+	return {
+		...m,
+		id: uid("msg"),
+		image: m.image ? { ...m.image } : undefined,
+		images: m.images?.map((im) => ({ ...im })),
+		replyVersions: m.replyVersions?.map((v) => ({
+			...v,
+			id: uid("ver"),
+			bubbles: v.bubbles.map((b) => ({ ...b })),
+			images: v.images?.map((im) => ({ ...im })),
+		})),
+	};
+}
+function hydrateMessage(m: ChatMessage) {
+	const images = m.images?.length ? m.images : m.image ? [m.image] : undefined;
+	const imageIndex = images ? Math.min(Math.max(m.imageIndex ?? images.length - 1, 0), images.length - 1) : undefined;
+	return {
+		...m,
+		images,
+		image: m.image ?? (images && imageIndex != null ? images[imageIndex] : undefined),
+		imageIndex,
+		imagePending: false,
+		imagePhase: undefined,
+		imageBusy: undefined
+	};
+}
+function hydrateRoles(roles: Role[] | undefined) {
+	return (roles ?? []).map((r) => ({
+		...r,
+		draft: normalizeDraft(r.draft),
+		imageParams: cloneImageParams(r.imageParams),
+		messages: (r.messages ?? []).map(hydrateMessage),
+		sort: typeof r.sort === "number" ? r.sort : 0
+	}));
+}
+let persistReady = false;
+export function markPersistReady() {
+	persistReady = true;
+}
+function countPersistedRoles(raw: string | null) {
+	if (!raw) return 0;
+	try {
+		const parsed = JSON.parse(raw);
+		return Array.isArray(parsed?.state?.roles) ? parsed.state.roles.length : 0;
+	} catch {
+		return 0;
+	}
+}
+function parsePersist(raw: string | null): { state?: any } | null {
+	if (!raw) return null;
+	try {
+		const v = JSON.parse(raw);
+		return v && typeof v === "object" ? v : null;
+	} catch {
+		return null;
+	}
+}
+function persistScore(p: { state?: { savedAt?: number; roles?: unknown } } | null) {
+	if (!p?.state) return -1;
+	const savedAt = Number(p.state.savedAt) || 0;
+	const roles = Array.isArray(p.state.roles) ? p.state.roles.length : 0;
+	return savedAt > 0 ? savedAt : roles;
+}
+function mergePersistBlobs(idb: string | null, ls: string | null) {
+	const a = parsePersist(idb);
+	const b = parsePersist(ls);
+	if (!a && !b) return null;
+	if (!a) return ls;
+	if (!b) return idb;
+	const primary = persistScore(a) >= persistScore(b) ? a : b;
+	const other = primary === a ? b : a;
+	if (primary.state) {
+		primary.state.appearanceCards = mergeCardLists(primary.state.appearanceCards, other.state?.appearanceCards);
+		primary.state.personaCards = mergeCardLists(primary.state.personaCards, other.state?.personaCards);
+	}
+	try {
+		return JSON.stringify(primary);
+	} catch {
+		return persistScore(a) >= persistScore(b) ? idb : ls;
+	}
+}
+const dualStorage: StateStorage = {
+	getItem: async (name: string) => {
+		let idb = null;
+		let ls = null;
+		try {
+			idb = await Promise.race([
+				kvGet(name),
+				new Promise<string | null>((resolve) => {
+					window.setTimeout(() => resolve(null), 8000);
+				}),
+			]);
+		} catch {
+			idb = null;
+		}
+		try {
+			ls = localStorage.getItem(name);
+		} catch {
+			ls = null;
+		}
+		const merged = mergePersistBlobs(idb, ls);
+		if (merged) return merged;
+		const nI = countPersistedRoles(idb);
+		const nL = countPersistedRoles(ls);
+		if (nI >= nL && idb) return idb;
+		return ls ?? idb;
+	},
+	setItem: async (name: string, value: string) => {
+		if (!persistReady) return;
+		try {
+			await kvSet(name, value);
+		} catch {
+			/* */
+		}
+		try {
+			localStorage.setItem(name, value);
+		} catch {
+			/* */
+		}
+		try {
+			const parsed = parsePersist(value);
+			const appear = parsed?.state?.appearanceCards;
+			const persona = parsed?.state?.personaCards;
+			if (Array.isArray(appear)) void writeAppearanceCards(appear);
+			if (Array.isArray(persona)) void writePersonaCards(persona);
+		} catch {
+			/* */
+		}
+	},
+	removeItem: async (name: string) => {
+		if (!persistReady) return;
+		try {
+			await kvDel(name);
+		} catch {
+			/* */
+		}
+		try {
+			localStorage.removeItem(name);
+		} catch {
+			/* */
+		}
+	}
+};
+const memoryStorage = {
+	getItem: async () => null,
+	setItem: async () => {},
+	removeItem: async () => {}
+};
+export function paramsRoleId(s: {
+	composer: AppState["composer"];
+	editingRoleId: string | null;
+	activeRoleId: string | null;
+	draftRoleId: string | null;
+	roles: { id: string }[];
+}): string | null {
+	if (s.composer === "edit" && s.editingRoleId) return s.editingRoleId;
+	if (s.composer === "new" || s.composer === "assemble") return s.activeRoleId || s.draftRoleId;
+	return s.activeRoleId ?? s.roles[0]?.id ?? null;
+}
+
+export const useAppStore = create<AppState>()(persist((set, get) => ({
+	hydrated: false,
+	settings: emptySettings(),
+	folders: [],
+	roles: [],
+	activeRoleId: null,
+	tab: "chat",
+	composer: "chat",
+	editingRoleId: null,
+	draftRoleId: null,
+	assembleSourceIds: [],
+	sidebarOpen: false,
+	selectMode: false,
+	selectedIds: [],
+	expandedFolderIds: [],
+	pureParams: defaultPureParams(),
+	pureHistory: [],
+	pureCurrentId: null,
+	purePresets: [],
+	personaCards: [],
+	appearanceCards: [],
+	paramsFocus: null,
+	draftBusy: false,
+	draftBusyKey: null,
+	setHydrated: (v) => set({ hydrated: v }),
+	setTab: (t) => set({ tab: t }),
+	setSidebar: (v) => set({
+		sidebarOpen: v,
+		...v ? {} : {
+			selectMode: false,
+			selectedIds: []
+		}
+	}),
+	setTheme: (t) => set({ settings: {
+		...get().settings,
+		theme: t
+	} }),
+	setGrokModel: (m) => set({ settings: {
+		...get().settings,
+		grokModel: m
+	} }),
+	setConnection: (naiKey, naiBase) => {
+		const connection = {
+			naiKey: naiKey.trim(),
+			naiBase: naiBase.trim() || "https://api.idlecloud.cc"
+		};
+		writeNaiBackup(connection);
+		set({ settings: {
+			...get().settings,
+			connection
+		} });
+		showToast("连接已保存");
+	},
+	openNewRole: () => {
+		const cur = get();
+		if (cur.draftRoleId) {
+			const existing = cur.roles.find((r) => r.id === cur.draftRoleId);
+			if (existing && existing.messages.length === 0) {
+				set({
+					roles: cur.roles.map((r) => r.id === existing.id ? {
+						...r,
+						folderId: existing.folderId
+					} : r),
+					composer: "new",
+					tab: "chat",
+					sidebarOpen: false,
+					editingRoleId: null,
+					activeRoleId: existing.id
+				});
+				return;
+			}
+		}
+		const role = makeRole({
+			name: "新角色",
+			folderId: null,
+			sort: nextSortTop(cur.folders, cur.roles, null, "role")
+		});
+		set({
+			roles: [role, ...cur.roles],
+			activeRoleId: role.id,
+			draftRoleId: role.id,
+			composer: "new",
+			tab: "chat",
+			sidebarOpen: false,
+			editingRoleId: null
+		});
+	},
+	openAssembleMulti: (roleIds) => {
+		const cur = get();
+		const picked = roleIds
+			.map((id) => cur.roles.find((r) => r.id === id))
+			.filter((r): r is Role => Boolean(r));
+		if (picked.length < 2) {
+			showToast("至少选两个聊天", "err");
+			return;
+		}
+		const sources = picked.slice(0, CAST_MAX);
+		if (picked.length > CAST_MAX) showToast(`最多 ${CAST_MAX} 人，已用前 ${CAST_MAX} 个`);
+		let roles = cur.roles;
+		if (cur.draftRoleId) {
+			const old = roles.find((r) => r.id === cur.draftRoleId);
+			if (old && old.messages.length === 0) roles = roles.filter((r) => r.id !== cur.draftRoleId);
+		}
+		const cast = sources.map((r) => ({ id: uid("cast"), ...memberFromRole(r) }));
+		const params = cloneImageParams(sources[0].imageParams);
+		params.characters = syncCharactersToCount([], cast.length, cast);
+		params.promptMid = "";
+		const draft = {
+			...defaultDraft(),
+			multi: true as const,
+			chatMode: "together" as const,
+			cast,
+			name: displayNameFromDraft({ ...defaultDraft(), multi: true, cast }, "新角色"),
+		};
+		const role = makeRole({
+			name: draft.name,
+			folderId: null,
+			sort: nextSortTop(cur.folders, roles, null, "role"),
+			draft,
+			imageParams: params,
+			avatarImageId: sources[0].avatarImageId,
+		});
+		set({
+			roles: [role, ...roles],
+			activeRoleId: role.id,
+			draftRoleId: role.id,
+			composer: "assemble",
+			assembleSourceIds: sources.map((r) => r.id),
+			tab: "chat",
+			sidebarOpen: false,
+			editingRoleId: null,
+			selectMode: false,
+			selectedIds: []
+		});
+	},
+	cancelComposer: () => {
+		const { composer, draftRoleId, roles, activeRoleId } = get();
+		if ((composer === "new" || composer === "assemble") && draftRoleId) {
+			const r = roles.find((x) => x.id === draftRoleId);
+			if (r && r.messages.length === 0) {
+				const next = roles.filter((x) => x.id !== draftRoleId);
+				set({
+					roles: next,
+					activeRoleId: activeRoleId === draftRoleId ? next[0]?.id ?? null : activeRoleId,
+					composer: "chat",
+					editingRoleId: null,
+					draftRoleId: null,
+					assembleSourceIds: [],
+					draftBusy: false,
+					draftBusyKey: null
+				});
+				return;
+			}
+		}
+		set({
+			composer: "chat",
+			editingRoleId: null,
+			draftRoleId: null,
+			assembleSourceIds: [],
+			draftBusy: false,
+			draftBusyKey: null
+		});
+	},
+	beginChat: () => {
+		const id = get().activeRoleId;
+		set({
+			composer: "chat",
+			draftRoleId: null,
+			assembleSourceIds: [],
+			tab: "chat",
+			sidebarOpen: false,
+			draftBusy: false,
+			draftBusyKey: null
+		});
+		return id;
+	},
+	createRole: (draft, params) => {
+		const cur = get();
+		const role = makeRole({
+			name: draft.name.trim() || "新角色",
+			folderId: null,
+			sort: nextSortTop(cur.folders, cur.roles, null, "role"),
+			draft: {
+				...draft,
+				name: draft.name.trim() || "新角色",
+				statusText: draft.statusOn ? draft.statusText.includes("👤角色") ? defaultStatusText(draft.name.trim() || "角色") : draft.statusText : defaultStatusText(draft.name.trim() || "角色")
+			},
+			imageParams: params ? cloneImageParams(params) : defaultImageParams()
+		});
+		if (role.draft.appearance && !role.draft.multi && !role.imageParams.promptMid.trim()) {
+			role.imageParams.promptMid = role.draft.appearance;
+		}
+		set({
+			roles: [role, ...get().roles],
+			activeRoleId: role.id,
+			composer: "chat",
+			tab: "chat",
+			sidebarOpen: false
+		});
+		return role.id;
+	},
+	updateRoleDraft: (id, draft) => {
+		set({ roles: get().roles.map((r) => {
+			if (r.id !== id) return r;
+			const nextDraft = {
+				...normalizeDraft(draft),
+				extras: renumberExtras(draft.extras ?? [])
+			};
+			const imageParams = cloneImageParams(r.imageParams);
+			if (nextDraft.multi) {
+				imageParams.characters = syncCharactersToCount(
+					imageParams.characters,
+					nextDraft.cast?.length ?? 1,
+					nextDraft.cast
+				);
+				if (!r.draft.multi) {
+					const mid = imageParams.promptMid.trim();
+					const app = (nextDraft.cast?.[0]?.appearance || r.draft.appearance || "").trim();
+					if (imageParams.characters[0] && !imageParams.characters[0].prompt.trim()) {
+						imageParams.characters[0] = { ...imageParams.characters[0], prompt: app || mid };
+					}
+					if (mid && app && mid === app) imageParams.promptMid = "";
+				}
+			} else if (nextDraft.appearance && !imageParams.promptMid.trim()) {
+				imageParams.promptMid = nextDraft.appearance;
+			}
+			const display = nextDraft.multi
+				? displayNameFromDraft(nextDraft, r.name || "新角色")
+				: (nextDraft.name.trim() || r.name);
+			return {
+				...r,
+				name: display,
+				draft: nextDraft,
+				updatedAt: Date.now(),
+				imageParams
+			};
+		}) });
+	},
+	updateRoleParams: (id, params) => {
+		set({ roles: get().roles.map((r) => r.id === id ? {
+			...r,
+			imageParams: cloneImageParams(params),
+			updatedAt: Date.now()
+		} : r) });
+	},
+	applyParamsFrom: (fromId) => {
+		const from = get().roles.find((r) => r.id === fromId);
+		const toId = paramsRoleId(get());
+		const to = toId ? get().roles.find((r) => r.id === toId) : undefined;
+		if (!from || !to) return;
+		const next = cloneImageParams(from.imageParams);
+		next.characters = cloneImageParams(to.imageParams).characters;
+		next.useCoords = to.imageParams.useCoords;
+		get().updateRoleParams(to.id, next);
+		showToast(`已应用「${from.name}」的参数`);
+	},
+	setActiveRole: (id) => set({
+		activeRoleId: id,
+		composer: "chat",
+		tab: "chat",
+		sidebarOpen: false
+	}),
+	patchRole: (id, patch) => {
+		set({ roles: get().roles.map((r) => r.id === id ? {
+			...r,
+			...patch,
+			updatedAt: Date.now()
+		} : r) });
+	},
+	renameRole: (id, name) => {
+		const n = name.trim();
+		if (!n) return;
+		set({ roles: get().roles.map((r) => r.id === id ? {
+			...r,
+			name: n,
+			draft: {
+				...r.draft,
+				name: n,
+				statusText: r.draft.statusText.replace(/^👤.*$/m, `👤${n}`)
+			},
+			updatedAt: Date.now()
+		} : r) });
+		showToast("已改名");
+		get().exitSelect();
+	},
+	setNote: (id, note) => {
+		set({ roles: get().roles.map((r) => r.id === id ? {
+			...r,
+			note,
+			updatedAt: Date.now()
+		} : r) });
+		showToast("备注已更新");
+	},
+	deleteRoles: (ids) => {
+		const setIds = new Set(ids);
+		const names = get().roles.filter((r) => setIds.has(r.id)).map((r) => r.name);
+		const roles = get().roles.filter((r) => !setIds.has(r.id));
+		const activeRoleId = setIds.has(get().activeRoleId ?? "") ? roles[0]?.id ?? null : get().activeRoleId;
+		set({
+			roles,
+			activeRoleId
+		});
+		if (names.length === 1) showToast(`已删除「${names[0]}」`);
+		else showToast(`已删除 ${names.length} 项`);
+		get().exitSelect();
+	},
+	addFolder: (name) => {
+		const cur = get();
+		const folder = {
+			id: uid("folder"),
+			name: name?.trim() || `文件夹${cur.folders.length + 1}`,
+			starred: false,
+			parentId: null,
+			sort: nextSortTop(cur.folders, cur.roles, null, "folder"),
+			createdAt: Date.now()
+		};
+		set({ folders: [folder, ...cur.folders] });
+		showToast("已创建文件夹");
+		return folder.id;
+	},
+	renameFolder: (id, name) => {
+		const n = name.trim();
+		if (!n) return;
+		set({ folders: get().folders.map((f) => f.id === id ? {
+			...f,
+			name: n
+		} : f) });
+		showToast("已改名");
+		get().exitSelect();
+	},
+	deleteFolders: (ids) => {
+		const setIds = new Set(ids);
+		const folders = get().folders;
+		const reparentTo = (id: string): string | null => {
+			const f = folders.find((x) => x.id === id);
+			const p = f ? folderParent(f) : null;
+			if (p && setIds.has(p)) return reparentTo(p);
+			return p;
+		};
+		set({
+			folders: folders.filter((f) => !setIds.has(f.id)).map((f) => f.parentId && setIds.has(f.parentId) ? {
+				...f,
+				parentId: reparentTo(f.parentId)
+			} : f),
+			roles: get().roles.map((r) => r.folderId && setIds.has(r.folderId) ? {
+				...r,
+				folderId: reparentTo(r.folderId)
+			} : r),
+			expandedFolderIds: get().expandedFolderIds.filter((id) => !setIds.has(id))
+		});
+		showToast("已删除");
+		get().exitSelect();
+	},
+	toggleStar: (ids) => {
+		const setIds = new Set(ids);
+		let folders = get().folders.map((f) => setIds.has(f.id) ? {
+			...f,
+			starred: !f.starred
+		} : f);
+		let roles = get().roles.map((r) => setIds.has(r.id) ? {
+			...r,
+			starred: !r.starred,
+			updatedAt: Date.now()
+		} : r);
+		const newlyStarred: { id: string; kind: "f" | "r"; parentId: string | null }[] = [];
+		for (const f of folders) {
+			if (setIds.has(f.id) && f.starred) newlyStarred.push({ id: f.id, kind: "f", parentId: folderParent(f) });
+		}
+		for (const r of roles) {
+			if (setIds.has(r.id) && r.starred) newlyStarred.push({ id: r.id, kind: "r", parentId: r.folderId ?? null });
+		}
+		const byParent = new Map<string, typeof newlyStarred>();
+		for (const s of newlyStarred) {
+			const k = s.parentId ?? "";
+			const arr = byParent.get(k) ?? [];
+			arr.push(s);
+			byParent.set(k, arr);
+		}
+		for (const [k, group] of byParent) {
+			const parentId = k === "" ? null : k;
+			const fs = group.filter((s) => s.kind === "f");
+			const rs = group.filter((s) => s.kind === "r");
+			let topF = nextSortTop(folders, roles, parentId, "folder");
+			for (const s of fs) {
+				folders = folders.map((f) => f.id === s.id ? { ...f, sort: topF } : f);
+				topF -= 10;
+			}
+			let topR = nextSortTop(folders, roles, parentId, "role");
+			for (const s of rs) {
+				roles = roles.map((r) => r.id === s.id ? { ...r, sort: topR } : r);
+				topR -= 10;
+			}
+		}
+		const nowStarred = newlyStarred.length > 0;
+		set({
+			folders,
+			roles
+		});
+		showToast(nowStarred ? "已星标并置顶" : "已取消星标");
+		get().exitSelect();
+	},
+	moveToFolder: (ids, folderId) => {
+		const setIds = new Set(ids);
+		const folders = get().folders;
+		if (folderId && setIds.has(folderId)) {
+			showToast("不能移到自身", "err");
+			return;
+		}
+		const blocked = (f: Folder) =>
+			Boolean(folderId && (f.id === folderId || isFolderDescendant(folders, folderId, f.id)));
+		let fTop = nextSortTop(folders, get().roles, folderId, "folder");
+		let rTop = nextSortTop(folders, get().roles, folderId, "role");
+		const folders2 = folders.map((f) => {
+			if (!setIds.has(f.id) || blocked(f)) return f;
+			const sort = fTop;
+			fTop += 10;
+			return { ...f, parentId: folderId, sort };
+		});
+		const roles2 = get().roles.map((r) => {
+			if (!setIds.has(r.id)) return r;
+			const sort = rTop;
+			rTop += 10;
+			return { ...r, folderId, sort, updatedAt: Date.now() };
+		});
+		const expanded = new Set(get().expandedFolderIds);
+		if (folderId) {
+			expanded.add(folderId);
+			let pid: string | null = folders.find((f) => f.id === folderId)?.parentId ?? null;
+			const seen = new Set<string>();
+			while (pid && !seen.has(pid)) {
+				expanded.add(pid);
+				seen.add(pid);
+				pid = folders.find((f) => f.id === pid)?.parentId ?? null;
+			}
+		}
+		set({ folders: folders2, roles: roles2, expandedFolderIds: [...expanded] });
+		showToast("已移动");
+		get().exitSelect();
+	},
+	duplicateItems: (ids) => {
+		const setIds = new Set(ids);
+		const copiedRoleIds = new Set<string>();
+		const copies: Role[] = [];
+		const folderCopies: Folder[] = [];
+		const cur = get();
+		const copyFolder = (f: Folder, parentId: string | null) => {
+			const nf = {
+				...f,
+				id: uid("folder"),
+				name: copyName(f.name),
+				starred: false,
+				parentId,
+				sort: nextSortOrdinary([...cur.folders, ...folderCopies], [...cur.roles, ...copies], parentId, "folder"),
+				createdAt: Date.now()
+			};
+			folderCopies.push(nf);
+			for (const child of cur.folders.filter((x) => folderParent(x) === f.id)) copyFolder(child, nf.id);
+			for (const r of cur.roles.filter((x) => x.folderId === f.id)) {
+				copiedRoleIds.add(r.id);
+				copies.push({
+					...r,
+					id: uid("role"),
+					folderId: nf.id,
+					starred: false,
+					name: copyName(r.name),
+					sort: nextSortOrdinary([...cur.folders, ...folderCopies], [...cur.roles, ...copies], nf.id, "role"),
+					messages: r.messages.map(cloneMessage),
+					imageParams: cloneImageParams(r.imageParams),
+					draft: {
+						...r.draft,
+						extras: r.draft.extras.map((e) => ({ ...e })),
+						cast: (r.draft.cast ?? []).map((c) => ({ ...c })),
+						name: copyName(r.name)
+					},
+					createdAt: Date.now(),
+					updatedAt: Date.now()
+				});
+			}
+		};
+		const selectedFolders = cur.folders.filter((f) => setIds.has(f.id));
+		const topSelected = selectedFolders.filter((f) => !f.parentId || !setIds.has(f.parentId));
+		for (const f of topSelected) copyFolder(f, folderParent(f));
+		for (const r of cur.roles) {
+			if (!setIds.has(r.id) || copiedRoleIds.has(r.id)) continue;
+			const name = copyName(r.name);
+			copies.push({
+				...r,
+				id: uid("role"),
+				folderId: r.folderId,
+				starred: false,
+				name,
+				sort: nextSortOrdinary([...cur.folders, ...folderCopies], [...cur.roles, ...copies], r.folderId, "role"),
+				messages: r.messages.map(cloneMessage),
+				imageParams: cloneImageParams(r.imageParams),
+				draft: {
+					...r.draft,
+					extras: r.draft.extras.map((e) => ({ ...e })),
+					cast: (r.draft.cast ?? []).map((c) => ({ ...c })),
+					name
+				},
+				createdAt: Date.now(),
+				updatedAt: Date.now()
+			});
+		}
+		set({
+			folders: [...folderCopies, ...cur.folders],
+			roles: [...copies, ...cur.roles]
+		});
+		showToast("已复制");
+		get().exitSelect();
+	},
+	enterSelect: (id) => set({
+		selectMode: true,
+		selectedIds: [id]
+	}),
+	toggleSelected: (id) => {
+		const cur = get().selectedIds;
+		set({ selectedIds: cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id] });
+	},
+	selectAll: () => {
+		const ids = [...get().folders.map((f) => f.id), ...get().roles.map((r) => r.id)];
+		set({
+			selectMode: true,
+			selectedIds: ids
+		});
+	},
+	exitSelect: () => set({
+		selectMode: false,
+		selectedIds: []
+	}),
+	toggleFolder: (id) => {
+		const cur = get().expandedFolderIds;
+		set({ expandedFolderIds: cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id] });
+	},
+	appendMessage: (roleId, msg) => {
+		set({ roles: get().roles.map((r) => r.id === roleId ? {
+			...r,
+			messages: [...r.messages, msg],
+			updatedAt: Date.now()
+		} : r) });
+	},
+	patchMessage: (roleId, msgId, patch) => {
+		set({ roles: get().roles.map((r) => r.id === roleId ? {
+			...r,
+			messages: r.messages.map((m) => m.id === msgId ? {
+				...m,
+				...patch
+			} : m),
+			updatedAt: Date.now()
+		} : r) });
+	},
+	truncateFrom: (roleId, msgId, inclusive) => {
+		const role = get().roles.find((r) => r.id === roleId);
+		if (!role) return [];
+		const idx = role.messages.findIndex((m) => m.id === msgId);
+		if (idx < 0) return role.messages;
+		const kept = role.messages.slice(0, inclusive ? idx : idx + 1);
+		set({ roles: get().roles.map((r) => r.id === roleId ? {
+			...r,
+			messages: kept,
+			memory: memoryAfterTruncate(role.memory, kept),
+			updatedAt: Date.now()
+		} : r) });
+		return kept;
+	},
+	replaceMessages: (roleId, messages) => {
+		set({ roles: get().roles.map((r) => r.id === roleId ? {
+			...r,
+			messages,
+			updatedAt: Date.now()
+		} : r) });
+	},
+	branchFrom: (roleId, msgId) => {
+		const src = get().roles.find((r) => r.id === roleId);
+		if (!src) return roleId;
+		const idx = src.messages.findIndex((m) => m.id === msgId);
+		const sliced = idx >= 0 ? src.messages.slice(0, idx + 1) : src.messages;
+		const n = src.name.replace(/\(分支\d+\)$/, "");
+		const existing = get().roles.filter((r) => r.name.startsWith(n + "(分支") || r.id === src.id).length;
+		const name = `${n}(分支${existing})`;
+		const copy = makeRole({
+			name,
+			folderId: src.folderId,
+			note: src.note,
+			draft: {
+				...src.draft,
+				name,
+				extras: src.draft.extras.map((e) => ({ ...e })),
+				cast: (src.draft.cast ?? []).map((c) => ({ ...c })),
+			},
+			imageParams: cloneImageParams(src.imageParams),
+			messages: sliced.map(cloneMessage),
+			memory: memoryAfterTruncate(src.memory, sliced),
+			avatarImageId: src.avatarImageId
+		});
+		set({
+			roles: [copy, ...get().roles],
+			activeRoleId: copy.id,
+			composer: "chat",
+			tab: "chat",
+			sidebarOpen: false
+		});
+		showToast(`已开分支「${name}」`);
+		return copy.id;
+	},
+	setPureParams: (p) => set({ pureParams: cloneImageParams(p) }),
+	addPureHistory: (item) => set({
+		pureHistory: [item, ...get().pureHistory].slice(0, 80),
+		pureCurrentId: item.id
+	}),
+	patchPureHistory: (id, patch) => {
+		set({ pureHistory: get().pureHistory.map((h) => h.id === id ? {
+			...h,
+			...patch
+		} : h) });
+	},
+	removePureHistory: (id) => {
+		const next = get().pureHistory.filter((h) => h.id !== id);
+		set({
+			pureHistory: next,
+			pureCurrentId: get().pureCurrentId === id ? next[0]?.id ?? null : get().pureCurrentId
+		});
+	},
+	setPureCurrent: (id) => set({ pureCurrentId: id }),
+	addPurePreset: (item) => set({
+		purePresets: [item, ...get().purePresets].slice(0, 60)
+	}),
+	patchPurePreset: (id, patch) => {
+		set({
+			purePresets: get().purePresets.map((p) => p.id === id ? {
+				...p,
+				...patch,
+				params: patch.params ? cloneImageParams(patch.params) : p.params
+			} : p)
+		});
+	},
+	deletePurePreset: (id) => set({
+		purePresets: get().purePresets.filter((p) => p.id !== id)
+	}),
+	savePersonaCard: (draft) => {
+		const name = displayNameFromDraft(draft, draft.name.trim() || "未命名");
+		const card = {
+			id: uid("card"),
+			name,
+			draft: cloneDraft({
+				...draft,
+				name
+			}),
+			createdAt: Date.now()
+		};
+		const personaCards = [card, ...get().personaCards];
+		set({ personaCards });
+		void writePersonaCards(personaCards);
+		showToast(`已保存角色卡${name}`, "ok", 1000);
+	},
+	deletePersonaCard: (id) => {
+		const personaCards = get().personaCards.filter((c) => c.id !== id);
+		set({ personaCards });
+		void writePersonaCards(personaCards);
+	},
+	saveAppearanceCard: (name, prompt) => {
+		const n = name.trim() || "未命名";
+		const card = {
+			id: uid("achar"),
+			name: n,
+			prompt,
+			createdAt: Date.now()
+		};
+		const appearanceCards = [card, ...get().appearanceCards];
+		set({ appearanceCards });
+		void writeAppearanceCards(appearanceCards);
+		showToast(`已保存角色${n}`, "ok", 1000);
+	},
+	deleteAppearanceCard: (id) => {
+		const appearanceCards = get().appearanceCards.filter((c) => c.id !== id);
+		set({ appearanceCards });
+		void writeAppearanceCards(appearanceCards);
+	},
+	reorderAppearanceCards: (orderedIds) => {
+		const map = new Map(get().appearanceCards.map((c) => [c.id, c]));
+		const appearanceCards = [];
+		for (const id of orderedIds) {
+			const c = map.get(id);
+			if (c) appearanceCards.push(c);
+		}
+		for (const c of get().appearanceCards) {
+			if (!orderedIds.includes(c.id)) appearanceCards.push(c);
+		}
+		set({ appearanceCards });
+		void writeAppearanceCards(appearanceCards);
+	},
+	reorderPersonaCards: (orderedIds) => {
+		const map = new Map(get().personaCards.map((c) => [c.id, c]));
+		const personaCards = [];
+		for (const id of orderedIds) {
+			const c = map.get(id);
+			if (c) personaCards.push(c);
+		}
+		for (const c of get().personaCards) {
+			if (!orderedIds.includes(c.id)) personaCards.push(c);
+		}
+		set({ personaCards });
+		void writePersonaCards(personaCards);
+	},
+	applySidebarLayout: (folders, roles) => {
+		set({
+			folders,
+			roles
+		});
+	},
+	applyAppearanceToActive: (prompt) => {
+		const id = paramsRoleId(get());
+		if (!id) return;
+		set({ roles: get().roles.map((r) => {
+			if (r.id !== id) return r;
+			const multi = isMultiDraft(r.draft);
+			return {
+				...r,
+				imageParams: {
+					...r.imageParams,
+					promptMid: prompt
+				},
+				draft: multi ? r.draft : {
+					...r.draft,
+					appearance: prompt
+				},
+				updatedAt: Date.now()
+			};
+		}) });
+	},
+	applyAppearanceToChar: (index, prompt, roleId) => {
+		const id = roleId || paramsRoleId(get());
+		if (!id) return;
+		const text = prompt ?? "";
+		set({ roles: get().roles.map((r) => {
+			if (r.id !== id) return r;
+			const characters = r.imageParams.characters.map((c, i) => i === index ? { ...c, prompt: text } : c);
+			let draft = r.draft;
+			if (isMultiDraft(draft)) {
+				let cast = [...(draft.cast ?? [])];
+				while (cast.length <= index) cast.push(emptyCastMember());
+				cast = cast.map((c, i) => i === index ? { ...c, appearance: text } : c);
+				draft = { ...draft, cast };
+			} else if (index === 0) {
+				draft = { ...draft, appearance: text };
+			}
+			return {
+				...r,
+				imageParams: { ...r.imageParams, characters },
+				draft,
+				updatedAt: Date.now()
+			};
+		}) });
+	},
+	copyCharPromptToAppearance: (index, roleId) => {
+		const id = roleId || paramsRoleId(get());
+		if (!id) return;
+		set({ roles: get().roles.map((r) => {
+			if (r.id !== id) return r;
+			const prompt = r.imageParams.characters[index]?.prompt ?? "";
+			if (!prompt.trim()) return r;
+			let draft = r.draft;
+			if (isMultiDraft(draft)) {
+				let cast = [...(draft.cast ?? [])];
+				while (cast.length <= index) cast.push(emptyCastMember());
+				cast = cast.map((c, i) => i === index ? { ...c, appearance: prompt } : c);
+				draft = { ...draft, cast };
+			} else {
+				draft = { ...draft, appearance: prompt };
+			}
+			return { ...r, draft, updatedAt: Date.now() };
+		}) });
+	},
+	setParamsFocus: (f) => set({ paramsFocus: f }),
+	setDraftBusy: (v, key) =>
+		set(
+			v
+				? { draftBusy: true, draftBusyKey: key ?? null }
+				: { draftBusy: false, draftBusyKey: null },
+		),
+	focusParams: (field, seed) => {
+		const id = get().activeRoleId;
+		if (field === "seed" && seed != null && id) {
+			const role = get().roles.find((r) => r.id === id);
+			if (role) {
+				get().updateRoleParams(id, {
+					...role.imageParams,
+					seed: String(seed)
+				});
+			}
+		}
+		set({
+			tab: "params",
+			sidebarOpen: false,
+			paramsFocus: field
+		});
+	}
+}), {
+	name: "huiyu-store-v1",
+	version: 6,
+	skipHydration: true,
+	storage: createJSONStorage(() => typeof window === "undefined" ? memoryStorage : dualStorage),
+	partialize: (s) => ({
+		settings: s.settings,
+		folders: s.folders,
+		roles: s.roles.map((r) => ({
+			...r,
+			messages: r.messages.map((m) => ({
+				...m,
+				imagePending: false,
+				imagePhase: undefined,
+				imageBusy: undefined
+			}))
+		})),
+		activeRoleId: s.activeRoleId,
+		expandedFolderIds: s.expandedFolderIds,
+		pureParams: s.pureParams,
+		pureHistory: s.pureHistory,
+		pureCurrentId: s.pureCurrentId,
+		purePresets: s.purePresets,
+		personaCards: s.personaCards,
+		appearanceCards: s.appearanceCards,
+		composer: s.composer,
+		editingRoleId: s.editingRoleId,
+		draftRoleId: s.draftRoleId,
+		assembleSourceIds: s.assembleSourceIds,
+		savedAt: Date.now()
+	}),
+	migrate: (persisted) => {
+		const s = persisted as Record<string, any>;
+		const expandedFolderIds = Array.isArray(s.expandedFolderIds) ? s.expandedFolderIds : s.openFolderId ? [s.openFolderId] : [];
+		const layout = hydrateLayout(s.folders, hydrateRoles(s.roles));
+		return {
+			...s,
+			folders: layout.folders,
+			roles: layout.roles,
+			expandedFolderIds,
+			appearanceCards: Array.isArray(s.appearanceCards) ? s.appearanceCards : [],
+			purePresets: Array.isArray(s.purePresets) ? s.purePresets : []
+		};
+	},
+	onRehydrateStorage: () => (state) => {
+		if (!state) return;
+		const layout = hydrateLayout(state.folders, hydrateRoles(state.roles));
+		state.folders = layout.folders;
+		state.roles = layout.roles;
+		if (!Array.isArray(state.personaCards)) state.personaCards = [];
+		if (!Array.isArray(state.appearanceCards)) state.appearanceCards = [];
+		if (!Array.isArray(state.purePresets)) state.purePresets = [];
+		if (!Array.isArray(state.expandedFolderIds)) state.expandedFolderIds = [];
+		const backup = readNaiBackup();
+		const persisted = state.settings?.connection;
+		const key = (persisted?.naiKey || "").trim() || backup.naiKey;
+		const base = (persisted?.naiBase || "").trim() || backup.naiBase || "https://api.idlecloud.cc";
+		if (key) {
+			const connection = {
+				naiKey: key,
+				naiBase: base
+			};
+			state.settings = {
+				...state.settings,
+				connection
+			};
+			writeNaiBackup(connection);
+		}
+	}
+}));
+export async function overlayLibraryCards() {
+	const [appearDisk, personaDisk] = await Promise.all([readAppearanceCards(), readPersonaCards()]);
+	const s = useAppStore.getState();
+	const appearanceCards = appearDisk.length ? mergeCardLists(appearDisk, s.appearanceCards) : s.appearanceCards;
+	const personaCards = personaDisk.length ? mergeCardLists(personaDisk, s.personaCards) : s.personaCards;
+	if (!appearDisk.length && appearanceCards.length) void writeAppearanceCards(appearanceCards);
+	if (!personaDisk.length && personaCards.length) void writePersonaCards(personaCards);
+	if (appearanceCards !== s.appearanceCards || personaCards !== s.personaCards) {
+		useAppStore.setState({
+			appearanceCards,
+			personaCards
+		});
+	}
+}
+export function rolesInFolder(folderId: string | null) {
+	return sortRoles(useAppStore.getState().roles.filter((r) => r.folderId === folderId));
+}
+export { defaultDraft, extraTitle };

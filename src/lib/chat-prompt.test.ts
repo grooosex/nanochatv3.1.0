@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { splitChatPrompt, chatImageSystem, IMAGE_SYSTEM, IMAGE_SHOT_RULES, IMAGE_BG_RULES, IMAGE_MULTI_RULES, PERSONA_VOICE_RULES, fieldPolishHint, voicePolishExtra, systemFor, statusBarSkeleton, chatContextBlock, imageApplyRules } from "./prompts.ts";
+import { splitChatPrompt, chatImageSystem, IMAGE_SYSTEM, IMAGE_SHOT_RULES, IMAGE_BG_RULES, IMAGE_MULTI_RULES, PERSONA_VOICE_RULES, fieldPolishHint, voicePolishExtra, systemFor, statusBarSkeleton, chatContextBlock, imageApplyRules, imageLengthRules, imageTagBudget, imageWriteMaxTokens } from "./prompts.ts";
 import { settleStuckImages, imageFailText, prettyImageError } from "./image-status.ts";
 import { emptyCharacter, defaultImageParams } from "./constants.ts";
 import type { Chat } from "./types.ts";
@@ -95,6 +95,55 @@ describe("chatImageSystem", () => {
   it("tells the model whether adult boost is on", () => {
     assert.match(chatImageSystem(stub({ adultBoost: true })), /【成人提示词加强】开/);
     assert.match(chatImageSystem(stub({ adultBoost: false })), /【成人提示词加强】关/);
+  });
+
+  it("caps new tags by selected NAI model, in 组, without the old 22–40 count", () => {
+    assert.equal(imageTagBudget("nai-diffusion-4-5-full"), 45);
+    assert.equal(imageTagBudget("nai-diffusion-5-full"), 110);
+    assert.equal(imageWriteMaxTokens("nai-diffusion-4-5-full"), 500);
+    assert.equal(imageWriteMaxTokens("nai-diffusion-5-curated"), 700);
+
+    const v45 = imageLengthRules("nai-diffusion-4-5-full", true);
+    assert.match(v45, /组 = 逗号隔开的一段/);
+    assert.match(v45, /必须不超过 45 组/);
+    assert.match(v45, /25–45 组/);
+    assert.match(v45, /够用就停/);
+    assert.match(v45, /表情必须 2–3 组/);
+    assert.match(v45, /衣服只写变化/);
+    assert.match(v45, /场景 1–2 组/);
+    assert.doesNotMatch(v45, /可以写到接近/);
+    assert.doesNotMatch(v45, /humiliation/);
+    assert.doesNotMatch(v45, /residual mess/);
+    assert.doesNotMatch(v45, /不超过 110/);
+    assert.doesNotMatch(v45, /22–40/);
+
+    const v5 = imageLengthRules("nai-diffusion-5-full", true);
+    assert.match(v5, /必须不超过 110 组/);
+    assert.match(v5, /40–110 组/);
+    assert.doesNotMatch(v5, /不超过 45/);
+    assert.doesNotMatch(v5, /25–45/);
+
+    const off = imageLengthRules("nai-diffusion-4-5-full", false);
+    assert.match(off, /必须不超过 45 组/);
+    assert.doesNotMatch(off, /可以写 25–45/);
+
+    const sys45 = chatImageSystem(stub({ adultBoost: true }));
+    assert.match(sys45, /必须不超过 45 组/);
+    assert.match(sys45, /25–45 组/);
+    assert.doesNotMatch(sys45, /22–40/);
+    assert.doesNotMatch(sys45, /写够/);
+    assert.doesNotMatch(sys45, /可以写到接近/);
+    assert.doesNotMatch(IMAGE_SYSTEM, /22–40/);
+    assert.doesNotMatch(IMAGE_SYSTEM, /写够/);
+
+    const sys5 = chatImageSystem(
+      stub({
+        adultBoost: true,
+        imageParams: { ...stub().imageParams, model: "nai-diffusion-5-full" },
+      }),
+    );
+    assert.match(sys5, /必须不超过 110 组/);
+    assert.doesNotMatch(sys5, /必须不超过 45 组/);
   });
 
   it("only forwards extras marked 应用到生图 as writer rules", () => {

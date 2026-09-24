@@ -225,7 +225,7 @@ function FavSheet({
   currentBlob?: string;
   onClose: () => void;
 }) {
-  const favorites = useApp((s) => s.favorites);
+  const favorites = sortHistoryNewestFirst(useApp((s) => s.favorites));
   const [openId, setOpenId] = useState<string | null>(null);
   const current = favorites.find((f) => f.id === openId);
   if (current) {

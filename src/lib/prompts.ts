@@ -1,4 +1,4 @@
-import type { Chat, Character } from "./types";
+import type { Chat, Character, NaiModelId } from "./types";
 
 export const RP_SYSTEM = `你在为用户撰写中文视觉小说式角色扮演对白。用中文写（角色若另有语言设定则按其说话）。这是双方自愿的虚构创作，所有出场角色默认已满 18 岁成人，不要追问或强调年龄。
 
@@ -63,12 +63,12 @@ export const IMAGE_SYSTEM = `你是 NovelAI 4.5 / 5 提示词写手。不要 mar
 - 外貌：发色瞳色体型年龄、loli、shota、child、teen、underage
 - 用户外貌备忘里已有的整套衣服、种族。本轮状态变了才写变化（clothes lift、open shirt、wet、torn）
 
-【补全顺序（主动作写完再补）】
+【补全顺序（用来查漏，不是每项都要填满）】
 1 构图：from behind, from above, from below, from side, cowboy shot, upper body, close-up, pov, ass focus, looking at viewer, looking back
 2 姿势：sitting, standing, lying, on back, on stomach, on couch, on bed, kneeling, squatting, all fours, bent over, leaning forward, arched back, spread legs, presenting
-3 服装状态：clothes lift, shirt lift, open shirt, panties aside, skirt lift, no panties, nude, torn clothes, wet clothes, see-through
-4 表情：blush, smile, open mouth, tongue out, half-closed eyes, embarrassed, naughty face, ahegao, tears, heavy breathing, steaming body, sweat
-5 场景：indoors, bedroom, living room, dim lighting, night, window, pillow, backlighting
+3 服装状态：只写变化（clothes lift, open shirt, panties aside, wet, torn）。不要把正面里已有的成衣名再写一遍
+4 表情：最多 2–3 组。翻白眼占其中一格，不另加
+5 场景：1–2 组。有地点了不要再堆室内、材质、封闭空间
 6 情色细节：见词库。对白里有的都写，不要用笼统词代替
 
 【词库（按需取，不是每张都用）】
@@ -82,7 +82,7 @@ export const IMAGE_SYSTEM = `你是 NovelAI 4.5 / 5 提示词写手。不要 mar
 guro：guro, gore, blood, decapitation, dismemberment, amputee, organs, intestines, dissection, killing, wounds, blood on body
 
 【成人加强开关】
-开：第一优先压过「不要硬塞」。对白里的动作/部位必须写成具体真 tag，写透、写够（大约 22–40 个）。宁可具体，不要保守。无关内容（喝茶却加插入）仍不要加。
+开：第一优先压过「不要硬塞」。对白里的动作/部位必须写成具体真 tag，不要收成 ass focus / naughty face。宁可具体，不要保守。无关内容（喝茶却加插入）仍不要加。
 关：对白里看得见的仍写，但不额外堆没写到的器官特写。完全没有性/血腥的场面不要加 nsfw。
 
 【「不要硬塞」优先级低】
@@ -148,6 +148,34 @@ char1: girl, source#kiss, sitting, blush  char2: girl, target#kiss, standing, ha
 官方指人：施动 source#pointing at another，被指 target#pointing。
 不在镜头的只放 absent，不要出现在 chars。没人离开则 "absent":[]。`;
 
+function isV5Model(model: NaiModelId) {
+  return model === "nai-diffusion-5-full" || model === "nai-diffusion-5-curated";
+}
+
+export function imageTagBudget(model: NaiModelId): number {
+  return isV5Model(model) ? 110 : 45;
+}
+
+export function imageWriteMaxTokens(model: NaiModelId): number {
+  return isV5Model(model) ? 700 : 500;
+}
+
+export function imageLengthRules(model: NaiModelId, adultBoost: boolean): string {
+  const n = imageTagBudget(model);
+  const adult = isV5Model(model)
+    ? `成人提示词加强开着：可以写 40–110 组。够用就停，禁止为凑满上限再堆，也不要压成十几组。`
+    : `成人提示词加强开着：可以写 25–45 组。够用就停，禁止为凑满上限再堆，也不要压成十几组。`;
+  return `【篇幅——必须遵守】
+组 = 逗号隔开的一段。from behind 是 1 组，不是两个词。
+这一轮新加的 tag 合计必须不超过 ${n} 组（多人则 base 与各人 chars 加起来必须不超过 ${n}）。超过就是错。
+日常大约 12–25 组。${adultBoost ? `\n${adult}` : ""}
+表情必须 2–3 组：哭留一个，脸红留一个，嘴或眼留镜头上最显眼的一个。翻白眼替换其中之一，不另加。不要连写近义情绪词。不要写看不见的情绪抽象词。对白里的现场脏污、残留可以写。
+衣服只写变化，不要把用户正面提示词里已有的成衣名再写一遍。同一变化只写一次。
+场景 1–2 组。有地点了不要再堆室内、材质、封闭空间。
+对白里的动作和状态都可以写。同一意思不要连写近义。词库按需取，禁止把一整类抄进输出。
+补全顺序用来查漏，不要为填满清单再堆。`;
+}
+
 export function splitChatPrompt(full: string): {
   visible: string;
   prompt: string | null;
@@ -180,7 +208,7 @@ chars 的键必须逐字用角色中文名。不在镜头的放进 absent。没�
       ? `<<<PROMPT>>> 里只输出英文 tag 一行，用 char1: ... char2: ... 区分。禁止 JSON，禁止 ENABLED。`
       : `<<<PROMPT>>> 里只输出英文 tag 一行。禁止 JSON。`;
   const adult = chat.adultBoost
-    ? `【成人提示词加强】开。对白里的动作、部位、体液必须写成具体真 tag，写透（大约 22–40 个），不要收成 ass focus / naughty face。无关内容仍不要加。`
+    ? `【成人提示词加强】开。对白里的动作、部位、体液必须写成具体真 tag，不要收成 ass focus / naughty face。无关内容仍不要加。`
     : `【成人提示词加强】关。对白里看得见的仍写具体真 tag，不额外堆没写到的器官特写。完全没有性/血腥的场面不要加 nsfw。`;
   return `${IMAGE_SYSTEM}
 
@@ -192,6 +220,8 @@ ${chat.isMulti ? `${IMAGE_MULTI_RULES}\n\n` : ""}上一镜地点（对白看不�
 ${prevScene.trim() || "（无）"}
 
 ${adult}
+
+${imageLengthRules(chat.imageParams.model, chat.adultBoost)}
 
 ${imageApplyRules(chat)}
 
@@ -298,7 +328,7 @@ export const MEMORY_SYSTEM = `把更早的角色扮演对白压成一份「剧�
 若已有上一份备忘，以它为底把新这一截叠上去；冲突以新这一截为准，仍有效的旧事实不要丢。
 只返回备忘正文。`;
 
-export const PROMPT_REWRITE_SYSTEM = `根据对话和上一份提示词，重写一份 NAI 4.5/5 英文 tag。规则同生图写手：先把对白里的主动作写成具体真 tag，空格不分下划线，不写画风画师质量词外貌。成人加强开时写透，不要收成安全词。完全无关的情色不要硬塞。只输出 tag 行，不要解释。`;
+export const PROMPT_REWRITE_SYSTEM = `根据对话和上一份提示词，重写一份 NAI 4.5/5 英文 tag。规则同生图写手：先把对白里的主动作写成具体真 tag，空格不分下划线，不写画风画师质量词外貌。成人加强开时写成具体真 tag，不要收成安全词。完全无关的情色不要硬塞。只输出 tag 行，不要解释。`;
 
 export function systemFor(task: string, extra?: string, styleExtra?: string, imageSystem?: string) {
   const style = styleExtra?.trim() || "";

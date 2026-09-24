@@ -217,7 +217,7 @@ export const useApp = create<State>((set, get) => ({
       ...data,
       settings: nextSettings,
       chats: live,
-      favorites: (data.favorites ?? []).map(migrateFavorite).filter(Boolean) as FavoriteItem[],
+      favorites: sortHistoryNewestFirst((data.favorites ?? []).map(migrateFavorite).filter(Boolean) as FavoriteItem[]),
       pureParams: normalizePureParams((pureRow?.value as ImageParams) ?? defaultPureParams()),
       currentId,
       history: sortHistoryNewestFirst(data.history ?? []),
@@ -693,18 +693,31 @@ export const useApp = create<State>((set, get) => ({
       blobId,
       createdAt: Date.now(),
     };
-    void db.favorites.put(f);
-    set((s) => ({ favorites: [f, ...s.favorites] }));
-    get().toast("已保存");
+    void (async () => {
+      try {
+        await db.favorites.put(f);
+        set((s) => ({ favorites: sortHistoryNewestFirst([f, ...s.favorites]) }));
+        get().toast("已保存");
+      } catch (err) {
+        get().toast(err instanceof Error ? err.message : "收藏失败");
+      }
+    })();
   },
 
   patchFavorite: (id, p) => {
-    set((s) => {
-      const favorites = s.favorites.map((f) => (f.id === id ? { ...f, ...p } : f));
-      const row = favorites.find((f) => f.id === id);
-      if (row) void db.favorites.put(row);
-      return { favorites };
-    });
+    const row = get().favorites.find((f) => f.id === id);
+    if (!row) return;
+    const next = { ...row, ...p };
+    void (async () => {
+      try {
+        await db.favorites.put(next);
+        set((s) => ({
+          favorites: sortHistoryNewestFirst(s.favorites.map((f) => (f.id === id ? next : f))),
+        }));
+      } catch (err) {
+        get().toast(err instanceof Error ? err.message : "收藏更新失败");
+      }
+    })();
   },
 
   deleteFavorite: (id) => {

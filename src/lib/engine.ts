@@ -1,5 +1,5 @@
 import { grokOnce, grokStream } from "./grok-client";
-import { chatContextBlock, fieldPolishHint, groupFormatHint, IMAGE_BG_RULES, IMAGE_MULTI_RULES, IMAGE_SHOT_RULES, imageApplyRules, roleSnapshot, splitChatPrompt, statusBarFor, voicePolishExtra } from "./prompts";
+import { chatContextBlock, fieldPolishHint, groupFormatHint, IMAGE_BG_RULES, IMAGE_MULTI_RULES, IMAGE_SHOT_RULES, imageApplyRules, imageLengthRules, imageWriteMaxTokens, roleSnapshot, splitChatPrompt, statusBarFor, voicePolishExtra } from "./prompts";
 import { buildPolishUserContent, extractFieldText, parsePolishJson, stripRoleOutput } from "./role-polish";
 import { formatUserForChat } from "./user-markup";
 import { stripSpeakerPrefix } from "./rp-text";
@@ -185,9 +185,11 @@ ${IMAGE_BG_RULES}
 
 ${chat.isMulti ? `${IMAGE_MULTI_RULES}\n\n` : ""}写法：先抽出本镜里最显眼的动作/部位，写成具体真 tag，不要收成 ass focus、naughty face 这种安全词。空格真 tag，禁止下划线。不要写画师质量词和外貌。
 用户已发生的动作优先于角色回里写软了的版本，必须写成已经发生，不要停在入口。
-成人开着：把画面写透、写够，不要保守。「不要硬塞」只挡住完全无关的内容。
+成人开着：把画面写成具体真 tag，不要保守。「不要硬塞」只挡住完全无关的内容。
 成人关着：对白里看得见的仍写，不额外堆没写到的特写；完全没有性/血腥则不加 nsfw。
 只输出标签，不要解释。
+
+${imageLengthRules(chat.imageParams.model, chat.adultBoost)}
 
 本镜（姿势、镜头、正在做的事只认这段）：
 ${shot || "（无）"}
@@ -240,8 +242,9 @@ export async function writeImageTags(
 ) {
   const extra = [
     chat.adultBoost
-      ? "成人提示词加强：开。这是最高优先级之一。对白里的动作、部位、体液必须写成具体真 tag，写透（22–40 个），不要收成 ass focus / naughty face。无关内容仍不要加。只输出标签，不要解释。"
+      ? "成人提示词加强：开。这是最高优先级之一。对白里的动作、部位、体液必须写成具体真 tag，不要收成 ass focus / naughty face。无关内容仍不要加。只输出标签，不要解释。"
       : "成人提示词加强：关。对白里看得见的仍写具体真 tag，不要额外堆没写到的器官特写。完全没有性/血腥的场面不要加 nsfw。只输出标签，不要解释。",
+    imageLengthRules(chat.imageParams.model, chat.adultBoost),
     chat.isMulti ? IMAGE_MULTI_RULES : "",
     imageApplyRules(chat),
   ]
@@ -253,7 +256,7 @@ export async function writeImageTags(
     task: "image",
     extraSystem: extra,
     messages: [{ role: "user", content: imageBrief(chat, { shot: shotText, residual: lastText, prevScene }) }],
-    max_tokens: 900,
+    max_tokens: imageWriteMaxTokens(chat.imageParams.model),
     ...imageWriteFields(imageModelId),
   };
   if (!dest.split) payload.grokModelId = grokModelId;

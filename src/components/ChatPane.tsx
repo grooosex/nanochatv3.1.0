@@ -667,20 +667,17 @@ function ImageBlock({ chat, msg, allowEmpty }: { chat: Chat; msg: ChatMessage; a
           icon={<Wand2 className="size-4" />}
           label={busy === "custom" && phaseLabel ? phaseLabel : "自定义修改"}
           busy={busy === "custom"}
-          disabled={locked || !current}
+          disabled={!chatImage}
           onClick={() => {
-            if (busy === "custom") {
-              cancelImage(chat.id, msg.id);
-              return;
-            }
-            if (!current || locked) return;
+            const src = pendingImg && (pendingImg.prompt || pendingImg.charTails) ? pendingImg : current ?? pendingImg;
+            if (!src) return;
             useApp.getState().setUI({
               customPrompt: {
                 chatId: chat.id,
                 msgId: msg.id,
-                imgId: current.id,
-                text: extractGrokTail(current.prompt, chat.imageParams) || current.prompt,
-                charTails: { ...(current.charTails || {}) },
+                imgId: src.id,
+                text: extractGrokTail(src.prompt, chat.imageParams) || src.prompt || "",
+                charTails: { ...(src.charTails || {}) },
               },
             });
           }}
@@ -726,12 +723,24 @@ export function CustomPromptModal() {
   const data = useApp((s) => s.ui.customPrompt);
   const setUI = useApp((s) => s.setUI);
   const chat = useApp((s) => (data ? s.chats.find((c) => c.id === data.chatId) : undefined));
+  const msg = chat?.messages.find((m) => m.id === data?.msgId);
+  const live = msg?.images.find((g) => g.id === data?.imgId);
+  const generating = msg?.images.some((g) => g.status !== "done" && g.status !== "error") ?? false;
   const [text, setText] = useState(data?.text ?? "");
   const [charTails, setCharTails] = useState<Record<string, string>>(data?.charTails ?? {});
+  const edited = useRef(false);
   useEffect(() => {
+    edited.current = false;
     setText(data?.text ?? "");
     setCharTails(data?.charTails ?? {});
   }, [data?.text, data?.imgId]);
+  const liveKey = live ? `${live.id}\n${live.prompt}\n${JSON.stringify(live.charTails || {})}` : "";
+  useEffect(() => {
+    if (!chat || !live || edited.current) return;
+    if (!live.prompt && !live.charTails) return;
+    setText(extractGrokTail(live.prompt, chat.imageParams) || live.prompt || "");
+    setCharTails({ ...(live.charTails || {}) });
+  }, [liveKey]);
   if (!data || !chat) return null;
   const insert = chat.isMulti && chat.promptMode === "insert";
   const chars = chat.imageParams.characters;
@@ -743,7 +752,7 @@ export function CustomPromptModal() {
             总提示追加到「正面提示词 · 中」后面，各角色追加到对应角色正面提示词后面。不会写入 ENABLED。
           </p>
           <div className="mb-1 text-[13px] font-medium">总提示（正面提示词 · 中）</div>
-          <TextArea className="min-h-[96px]" value={text} onChange={(e) => setText(e.target.value)} />
+          <TextArea className="min-h-[96px]" value={text} onChange={(e) => { edited.current = true; setText(e.target.value); }} />
           {chars.map((ch, i) => {
             const role = chat.characters.find((c) => c.id === ch.id);
             const name = (role?.name || ch.name || "").trim();
@@ -756,14 +765,17 @@ export function CustomPromptModal() {
               <TextArea
                 className="min-h-[88px]"
                 value={charTails[ch.id] ?? ""}
-                onChange={(e) => setCharTails((prev) => ({ ...prev, [ch.id]: e.target.value }))}
+                onChange={(e) => {
+                  edited.current = true;
+                  setCharTails((prev) => ({ ...prev, [ch.id]: e.target.value }));
+                }}
               />
             </div>
             );
           })}
         </>
       ) : (
-        <TextArea className="min-h-[160px]" value={text} onChange={(e) => setText(e.target.value)} />
+        <TextArea className="min-h-[160px]" value={text} onChange={(e) => { edited.current = true; setText(e.target.value); }} />
       )}
       <div className="mt-4 flex gap-2">
         <button
@@ -773,8 +785,11 @@ export function CustomPromptModal() {
           取消
         </button>
         <button
-          className="h-12 flex-[1.2] rounded-full bg-primary text-[15px] font-medium text-on-primary"
+          type="button"
+          disabled={generating}
+          className="h-12 flex-[1.2] rounded-full bg-primary text-[15px] font-medium text-on-primary disabled:opacity-40"
           onClick={() => {
+            if (generating) return;
             void attachImage(data.chatId, data.msgId, "custom", text, insert ? charTails : undefined);
             setUI({ customPrompt: null });
           }}
@@ -782,6 +797,18 @@ export function CustomPromptModal() {
           按这个生成
         </button>
       </div>
+      {generating ? (
+        <button
+          type="button"
+          className="mt-3 w-full text-center text-[13px] text-danger"
+          onClick={() => {
+            cancelImage(data.chatId, data.msgId);
+            setUI({ customPrompt: null });
+          }}
+        >
+          取消这次生图
+        </button>
+      ) : null}
     </Modal>
   );
 }

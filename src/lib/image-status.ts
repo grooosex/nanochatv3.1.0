@@ -39,6 +39,7 @@ export function prettyImageError(error?: string) {
     }
   }
   if (/too many concurrent/i.test(msg) || /rate limit/i.test(msg) || /"statusCode"\s*:\s*429/.test(raw)) return "请求太频繁";
+  if (/<!doctype|<html|internal server error/i.test(raw)) return "中转站返回了异常页面";
   return msg;
 }
 

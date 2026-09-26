@@ -5,9 +5,9 @@ import { formatUserForChat } from "./user-markup";
 import { stripSpeakerPrefix } from "./rp-text";
 import { replyContextText } from "./reply-markup.ts";
 import { resolveImageWrite, imageWriteFields } from "./image-ai.ts";
-import { buildNaiPayload } from "./nai";
+import { buildIdlecloudBody, buildNaiPayload } from "./nai";
 import { sanitizeNaiTags, assignCharTags, extractJsonObject, resolveAbsentIds, presenceFromTags, legacyPresentIds } from "./nai-tags";
-import { IMAGE_GEN_TIMEOUT_MS, RECENT_TURNS } from "./constants";
+import { IMAGE_GEN_TIMEOUT_MS, NAI_HOP_TIMEOUT_MS, NAI_POLL_MS, NAI_POLL_TRIES, RECENT_TURNS } from "./constants";
 import { saveBlob, useApp } from "./store";
 import { presetStyle } from "./st-preset";
 import type { Chat, ChatMessage, GenImage, GrokModelId } from "./types";
@@ -287,6 +287,85 @@ export function afterPaint() {
   return new Promise<void>((r) => requestAnimationFrame(() => r()));
 }
 
+type NaiHop = {
+  ok?: boolean;
+  error?: string;
+  image?: string;
+  jobId?: string;
+  statusUrl?: string;
+  fileUrl?: string;
+  pending?: boolean;
+  v5?: {
+    confirm_url?: string;
+    confirmation_required?: boolean;
+    sha256?: string;
+    size_bytes?: number;
+  };
+};
+
+function sleepMs(ms: number, signal?: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+function isHopTimeout(e: unknown) {
+  return e instanceof Error && e.name === "HopTimeout";
+}
+
+async function naiHop(body: Record<string, unknown>, signal?: AbortSignal): Promise<NaiHop> {
+  const hop = AbortSignal.timeout(NAI_HOP_TIMEOUT_MS);
+  const combined = signal ? AbortSignal.any([signal, hop]) : hop;
+  let res: Response;
+  try {
+    res = await fetch("/api/nai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: combined,
+    });
+  } catch (e) {
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    const name = e instanceof Error || e instanceof DOMException ? e.name : "";
+    if (name === "AbortError" || name === "TimeoutError") {
+      const err = new Error("中转站超时，请稍后重试");
+      err.name = "HopTimeout";
+      throw err;
+    }
+    throw new Error(imageFailText(e, signal));
+  }
+  const raw = await res.text();
+  let data: NaiHop;
+  try {
+    data = JSON.parse(raw) as NaiHop;
+  } catch {
+    throw new Error("中转站返回了异常页面");
+  }
+  if (!data.ok) throw new Error(data.error || "生图失败");
+  return data;
+}
+
+async function imageFromB64(b64: string) {
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  const blob = new Blob([arr], { type: "image/png" });
+  const blobId = await saveBlob(blob);
+  return { blobId, blob };
+}
+
 export async function generateNai(opts: {
   chat: Chat;
   grokTail: string;
@@ -305,39 +384,53 @@ export async function generateNai(opts: {
     insertMode: opts.chat.promptMode,
     seed: opts.seed,
   });
+  const payload = buildIdlecloudBody(built, opts.chat.imageParams, opts.chat.promptMode);
   opts.onStart?.();
-  const signal = withImageTimeout(opts.signal);
-  let res: Response;
+  const finish = async (b64: string) => {
+    opts.onReceiving?.();
+    await afterPaint();
+    const saved = await imageFromB64(b64);
+    return { blobId: saved.blobId, seed: built.seed, prompt: built.finalPrompt, blob: saved.blob };
+  };
+  const base = { baseUrl: opts.baseUrl, apiKey: opts.apiKey };
+  let submit: NaiHop;
   try {
-    res = await fetch("/api/nai", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "generate",
-        baseUrl: opts.baseUrl,
-        apiKey: opts.apiKey,
-        payload: { input: built.input, model: built.model, action: "generate", parameters: built.parameters },
-      }),
-      signal,
-    });
+    submit = await naiHop({ ...base, action: "submit", payload }, opts.signal);
   } catch (e) {
-    throw new Error(imageFailText(e, opts.signal));
+    if (isHopTimeout(e)) throw new Error("中转站超时，请稍后重试");
+    throw e;
   }
-  let data: { ok: boolean; image?: string; error?: string; status?: number };
-  try {
-    data = (await res.json()) as { ok: boolean; image?: string; error?: string; status?: number };
-  } catch (e) {
-    throw new Error(imageFailText(e, opts.signal));
+  if (submit.image) return finish(submit.image);
+  if (!submit.jobId && !submit.statusUrl && !submit.fileUrl) throw new Error("中转站没有返回任务");
+  let statusUrl = submit.statusUrl;
+  let fileUrl = submit.fileUrl;
+  let v5 = submit.v5;
+  for (let i = 0; i < NAI_POLL_TRIES; i++) {
+    if (fileUrl) {
+      try {
+        const fetched = await naiHop({ ...base, action: "fetch", fileUrl, v5 }, opts.signal);
+        if (fetched.image) return finish(fetched.image);
+      } catch (e) {
+        if (!isHopTimeout(e)) throw e;
+      }
+      fileUrl = undefined;
+    }
+    await sleepMs(NAI_POLL_MS, opts.signal);
+    let poll: NaiHop;
+    try {
+      poll = await naiHop({ ...base, action: "poll", jobId: submit.jobId, statusUrl }, opts.signal);
+    } catch (e) {
+      if (isHopTimeout(e)) continue;
+      throw e;
+    }
+    if (poll.statusUrl) statusUrl = poll.statusUrl;
+    if (poll.image) return finish(poll.image);
+    if (poll.fileUrl) {
+      fileUrl = poll.fileUrl;
+      v5 = poll.v5;
+    }
   }
-  if (!data.ok || !data.image) throw new Error(data.error || "生图失败");
-  opts.onReceiving?.();
-  await afterPaint();
-  const bin = atob(data.image);
-  const arr = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-  const blob = new Blob([arr], { type: "image/png" });
-  const blobId = await saveBlob(blob);
-  return { blobId, seed: built.seed, prompt: built.finalPrompt, blob };
+  throw new Error("生图超时");
 }
 
 export function parseGroup(text: string): { name: string; content: string; narrator?: boolean }[] {

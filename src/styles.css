@@ -43,6 +43,7 @@
     background: var(--color-bg);
     color: var(--color-ink);
     font-family: var(--font-sans);
+    color-scheme: light;
     -webkit-tap-highlight-color: transparent;
     text-size-adjust: 100%;
   }
@@ -116,6 +117,7 @@
 }
 
 html.dark {
+  color-scheme: dark;
   --color-bg: #1a1714;
   --color-surface: #221e1a;
   --color-card: #2a2520;

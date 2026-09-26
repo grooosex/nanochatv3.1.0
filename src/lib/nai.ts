@@ -157,6 +157,51 @@ export function buildNaiPayload(opts: {
   };
 }
 
+export function buildIdlecloudBody(
+  built: ReturnType<typeof buildNaiPayload>,
+  params: ImageParams,
+  insertMode: "insert" | "legacy" = "insert",
+) {
+  const body: Record<string, unknown> = {
+    model: built.model,
+    positivePrompt: built.finalPrompt,
+    negativePrompt: params.negative,
+    width: params.width,
+    height: params.height,
+    steps: params.steps,
+    scale: params.scale,
+    sampler: params.sampler,
+    seed: built.seed,
+    noise_schedule: params.noiseSchedule,
+    promptGuidanceRescale: params.cfgRescale,
+    sm: false,
+    sm_dyn: false,
+    autoSmea: false,
+    decrisp: params.decrisper,
+    variety: params.varietyPlus,
+    prefer_brownian: params.sampler.includes("ancestral") || params.sampler.includes("sde"),
+    deliberate_euler_ancestral_bug: false,
+    legacy: false,
+    legacy_uc: false,
+    legacy_v3_extend: false,
+    use_coords: params.useCoords,
+    use_upscale_credits: false,
+  };
+  const useChars = naiFamily(params.model) !== "v3" && insertMode === "insert" && built.characterPrompts.length > 0;
+  if (useChars) {
+    body.characterPrompts = built.characterPrompts;
+    body.v4_prompt_char_captions = built.characterPrompts.map((c) => ({
+      char_caption: c.prompt,
+      centers: [{ x: c.center.x, y: c.center.y }],
+    }));
+    body.v4_negative_prompt_char_captions = built.characterPrompts.map((c) => ({
+      char_caption: c.uc,
+      centers: [{ x: c.center.x, y: c.center.y }],
+    }));
+  }
+  return body;
+}
+
 export function syncCharsFromRole(
   params: ImageParams,
   roles: { id: string; name: string; appearance: string; imageEnabled: boolean; prompt: string; uc: string; x: number; y: number }[],

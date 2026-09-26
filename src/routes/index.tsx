@@ -5,7 +5,7 @@ export const Route = createFileRoute("/")({ component: Home });
 
 function Home() {
   return (
-    <div className="h-[100dvh] overflow-hidden">
+    <div className="h-[100dvh] overflow-hidden bg-bg">
       <App />
     </div>
   );

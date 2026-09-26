@@ -92,11 +92,10 @@ guro：guro, gore, blood, decapitation, dismemberment, amputee, organs, intestin
 看用户消息末尾的格式要求：
 - 「只输出英文 tag 一行」：只输出一行逗号分隔 tag。禁止 JSON、禁止 markdown、禁止解释。
 - 「输出 JSON」：只输出一个 JSON 对象，不要围栏，不要解释。JSON 只是分拣单，不会被写进 NAI。
-  {"base":"这一镜真正画出来的人数、场景、镜头、光线","chars":{"在场者名单上的中文名":"该人这一镜的动作表情姿势"},"absent":["不在场的角色名"]}
+  {"base":"场景、镜头、光线","chars":{"在场者名单上的中文名":"该人这一镜的动作表情姿势"},"absent":["不在场的角色名"]}
   chars 只写这一镜真正在场的人。键必须逐字用名单上的中文名，禁止 girl、char1、1girl、角色1。
   不在场的（只是被口头提起也算不在场）只放 absent，不要出现在 chars。名单上的人不是每个人都要写。
-  base 的人数只数真正画出来的人，不要按名单写成 2girls。chars 值里写 girl 或 boy，不要 1girl。
-  没占角色槽的人：只有男人身子真的进了画面（伸手、抱、插入、看得见身体）才写进 base（1boy、faceless male），禁止写进别人的 chars。背对我、看着我、叫哥哥只是镜头和称呼，不要因此加 1boy 或 faceless male。
+  chars 值里写 girl 或 boy，不要 1girl。
 
 【反例 → 正例】（说明怎么跟画面走，不是固定配方）
 错：shirt_collar_crooked, sitting_on_sofa, teasing_pose
@@ -134,7 +133,7 @@ export const IMAGE_MULTI_RULES = `【多人互动——必须遵守】
 这轮没出现，或者只是被口头提起、人不在画面里：不算在场。
 在场的写入 chars。不在场的放进 absent，不要写 tag，不要占一条 chars。名单上的人不是每个人都要写。
 
-总提示（base）：这一镜真正画出来的人数、场景、构图、光、道具、群体氛围。地点写最前。人数只数真正画出来的人，不要按名单写成 2girls。背对我、看着我、叫哥哥是镜头和称呼，不是多一个人：两个人背对镜头就是 2girls、from behind、back turned，不要加 1boy。只有男人身子真的进了画面（伸手、抱、插入、看得见身体）才在 base 写 1boy、faceless male，禁止写进某个角色的 chars。不要写 source# / target# / mutual#。群体动作词（yuri, ffm threesome, sex from behind）可以留在 base，谁对谁仍拆到在场的人。
+总提示（base）：场景、构图、光、道具、群体氛围。地点写最前。人数按画面里真正画出来的人写：一个女孩写 1girl，两个女孩写 2girls，一个女孩一个男孩写 1girl, 1boy，两个女孩一个男孩写 2girls, 1boy，以此类推。禁止有 3people 这种写法。写进角色提示词的人必须算进去。不要因为用户在场、在说话，就多画一个人。画面里没有他的身体，就不要写他。有他的身体，写在总提示里，加 1boy，不要写到别的角色身上。不要写 source# / target# / mutual#。群体动作词（yuri, ffm threesome, sex from behind）可以留在 base，谁对谁仍拆到在场的人。
 
 各角色（chars）：只写在场的人，接到该角色自己的正面提示词后面。键必须逐字用角色名单里的中文名；正文用了外号，键仍用名单上的名字。以 girl 或 boy 起头（不要 1girl）。只写这一人此刻的姿势、表情、视角、服装即时状态、动作。不要写发色瞳色发型体型种族。禁止用 girl、char1、1girl、角色1 当键。
 
@@ -146,12 +145,6 @@ export const IMAGE_MULTI_RULES = `【多人互动——必须遵守】
 
 两人都在场：
 {"base":"2girls, bedroom, from side","chars":{"角色甲":"girl, source#kiss, sitting, blush, open mouth","角色乙":"girl, target#kiss, standing, half-closed eyes"},"absent":[]}
-
-只有角色甲在场，角色乙只是被提到，玩家只是镜头（背对我站着，没有画出男人身子）：
-{"base":"1girl, bedroom, from behind","chars":{"角色甲":"girl, standing, back turned"},"absent":["角色乙"]}
-
-男人身子真的进了画面（伸手、抱着，没有角色槽）：
-{"base":"1girl, 1boy, bedroom, from side, faceless male","chars":{"角色甲":"girl, target#hug, standing"},"absent":["角色乙"]}
 
 原版一行只给在场的人写 char1 / char2，不在场的整段省略。
 官方指人：施动 source#pointing at another，被指 target#pointing。`;
@@ -213,7 +206,7 @@ export function imageApplyRules(chat: Chat): string {
   if (!bits.length) return "";
   return `【生图规则·作者指令·压过前面的默认】
 下面是用户给写 tag 的规则，只约束怎么写，禁止把这段原文抄进 tag。
-和前面的默认冲突时，以这里为准。这里写了不要画某个人、不要写 boy / 1boy / faceless male，就不要写，不要因为背对我或称呼再加回去。
+和前面的默认冲突时，以这里为准。
 ${bits.join("\n\n")}`;
 }
 

@@ -179,6 +179,9 @@ describe("chatImageSystem", () => {
     assert.doesNotMatch(single, /【多人互动/);
     assert.doesNotMatch(single, /source#kiss/);
     assert.doesNotMatch(single, /source#teasing/);
+    assert.doesNotMatch(single, /不要按名单写成 2girls/);
+    assert.doesNotMatch(single, /3people/);
+    assert.doesNotMatch(single, /不要因为用户在场/);
 
     const a = emptyCharacter(1);
     const b = emptyCharacter(2);
@@ -200,9 +203,11 @@ describe("chatImageSystem", () => {
     assert.doesNotMatch(multi, /source#teasing/);
     assert.match(multi, /不要输出 ENABLED/);
     assert.match(multi, /谁在场/);
-    assert.match(multi, /不要加 1boy/);
-    assert.match(multi, /背对我/);
-    assert.doesNotMatch(multi, /玩家在画面里但没有角色槽/);
+    assert.match(multi, /不要因为用户在场/);
+    assert.match(multi, /2girls, 1boy/);
+    assert.match(multi, /禁止有 3people 这种写法/);
+    assert.doesNotMatch(multi, /不要按名单写成 2girls/);
+    assert.doesNotMatch(multi, /背对我/);
     assert.doesNotMatch(multi, new RegExp(`"${a.id}"`));
     assert.doesNotMatch(multi, new RegExp(`"${b.id}"`));
     assert.match(multi, /七实/);
@@ -349,6 +354,10 @@ describe("stuck image + move folder order", () => {
       "请求太频繁",
     );
     assert.equal(prettyImageError("还没连接 NAI 中转站"), "还没连接 NAI 中转站");
+    assert.equal(
+      prettyImageError("<html><head><title>Internal Server Error</title></head><body>"),
+      "中转站返回了异常页面",
+    );
   });
 });
 

@@ -1,0 +1,223 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { buildIdlecloudBody } from "@/lib/nai-payload";
+import { extractImageBuffer } from "@/lib/zip-png";
+import type { ImageParams } from "@/lib/types";
+
+function normalizeBase(url: string): string {
+  return (url || "https://api.idlecloud.cc").replace(/\/+$/, "");
+}
+
+function absUrl(base: string, url: string): string {
+  if (/^https?:\/\//i.test(url)) return url;
+  return normalizeBase(base) + (url.startsWith("/") ? url : `/${url}`);
+}
+
+function looksHtml(text: string): boolean {
+  const t = text.trimStart().slice(0, 32).toLowerCase();
+  return t.startsWith("<!doctype") || t.startsWith("<html") || t.startsWith("<?xml");
+}
+
+function mapIdlecloudError(status: number, body: string): string {
+  let code = "";
+  let msg = "";
+  try {
+    const j = JSON.parse(body) as { error?: string; message?: string; detail?: string; success?: boolean };
+    code = String(j.error || "");
+    msg = String(j.message || j.detail || "");
+  } catch {
+    if (body && !looksHtml(body)) msg = body.slice(0, 180);
+  }
+  if (code === "NOVELAI_V5_WEEKLY_QUOTA_EXCEEDED") return "NovelAI V5 本周额度已用完，请改用 V4.5 或等重置";
+  if (code === "NOVELAI_V5_BACKEND_QUOTA_EXHAUSTED") return "V5 后端额度暂时耗尽，请稍后或改用 V4.5";
+  if (status === 401 || status === 403) return "API Key 无效或档位不够，请重新填写";
+  if (status === 402) return "中转站积分不足";
+  if (status === 409) return "已有一张图正在生成，请等它完成后再试";
+  if (status === 429 || code === "RATE_LIMITED") {
+    return msg || "中转站限制 20 秒内只能提交一次生图（聊天配图和纯生图共用），请稍后再试";
+  }
+  if (status === 504) return "中转站超时，请稍后重试";
+  return msg || code || `中转站 ${status}`;
+}
+
+function authHeaders(key: string): Record<string, string> {
+  return {
+    Authorization: `Bearer ${key}`,
+    Accept: "application/json, application/zip, image/png, */*",
+  };
+}
+
+async function fetchImage(base: string, key: string, url: string): Promise<Buffer> {
+  const res = await fetch(absUrl(base, url), { headers: { Authorization: `Bearer ${key}` } });
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (!res.ok) throw new Error(mapIdlecloudError(res.status, buf.toString("utf8")));
+  return extractImageBuffer(buf);
+}
+
+type JobJson = {
+  job_id?: string;
+  status?: string;
+  image_url?: string;
+  image?: string;
+  error?: string;
+  message?: string;
+  v5_delivery?: {
+    id?: string;
+    status_url?: string;
+    file_url?: string;
+    confirm_url?: string;
+    confirmation_required?: boolean;
+    sha256?: string;
+    size_bytes?: number;
+  };
+};
+
+function parseJob(text: string): JobJson | null {
+  if (!text || looksHtml(text)) return null;
+  try {
+    return JSON.parse(text) as JobJson;
+  } catch {
+    return null;
+  }
+}
+
+async function maybeConfirm(base: string, key: string, v5: JobJson["v5_delivery"]) {
+  if (!v5?.confirmation_required || !v5.confirm_url) return;
+  try {
+    await fetch(absUrl(base, v5.confirm_url), {
+      method: "POST",
+      headers: { ...authHeaders(key), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sha256: v5.sha256,
+        size_bytes: v5.size_bytes,
+      }),
+    });
+  } catch {
+    /* confirm is optional */
+  }
+}
+
+export const Route = createFileRoute("/api/nai")({
+  server: {
+    handlers: {
+      POST: async ({ request }) => {
+        try {
+          let body: {
+            phase?: string;
+            key?: string;
+            base?: string;
+            params?: ImageParams;
+            positive?: string;
+            seed?: number;
+            job_id?: string;
+            status_url?: string;
+            file_url?: string;
+            v5_delivery?: JobJson["v5_delivery"];
+          };
+          try {
+            body = (await request.json()) as typeof body;
+          } catch {
+            return Response.json({ error: "请求格式错误" }, { status: 400 });
+          }
+          const key = body.key?.trim() ?? "";
+          if (!key) {
+            return Response.json({ error: "尚未填写 NAI 中转站 API Key，请点右上角连接并保存" }, { status: 400 });
+          }
+          const base = body.base || "https://api.idlecloud.cc";
+          const seed = body.seed ?? 0;
+
+          if (body.phase === "fetch") {
+            const fileUrl = body.file_url;
+            if (!fileUrl) {
+              return Response.json({ error: "缺少图片地址" }, { status: 400 });
+            }
+            const img = await fetchImage(base, key, fileUrl);
+            await maybeConfirm(base, key, body.v5_delivery);
+            return Response.json({ image: img.toString("base64"), seed });
+          }
+
+          if (body.phase === "poll") {
+            const resultUrl = body.status_url
+              ? absUrl(base, body.status_url)
+              : `${normalizeBase(base)}/api/get_result/${body.job_id}`;
+            if (!body.job_id && !body.status_url) {
+              return Response.json({ error: "缺少任务编号" }, { status: 400 });
+            }
+            const res = await fetch(resultUrl, { headers: authHeaders(key) });
+            const text = await res.text();
+            if (!res.ok) {
+              return Response.json({ error: mapIdlecloudError(res.status, text) }, { status: 400 });
+            }
+            const j = parseJob(text);
+            if (!j) return Response.json({ status: "queued" });
+            if (j.status === "failed" || (j.error && j.status !== "completed" && !j.image_url && !j.image)) {
+              return Response.json({ failed: true, error: j.error || j.message || "生成失败" });
+            }
+            if (j.status === "completed" || j.image_url || j.image || j.v5_delivery?.file_url) {
+              if (typeof j.image === "string" && j.image.length > 80) {
+                const b64 = j.image.includes("base64,") ? j.image.split("base64,").pop()! : j.image;
+                return Response.json({ image: b64, seed });
+              }
+              const fileUrl = j.v5_delivery?.file_url || j.image_url;
+              if (!fileUrl) return Response.json({ status: j.status || "processing" });
+              return Response.json({
+                status: "ready",
+                file_url: fileUrl,
+                v5_delivery: j.v5_delivery,
+                seed,
+              });
+            }
+            return Response.json({ status: j.status || "queued" });
+          }
+
+          if (!body.params || !body.positive) {
+            return Response.json({ error: "缺少提示词或参数" }, { status: 400 });
+          }
+          const payload = buildIdlecloudBody({ params: body.params, positive: body.positive, seed });
+          const res = await fetch(`${normalizeBase(base)}/api/generate_image`, {
+            method: "POST",
+            headers: { ...authHeaders(key), "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const buf = Buffer.from(await res.arrayBuffer());
+          const text = buf.toString("utf8");
+          if (!res.ok) {
+            const status = res.status === 401 || res.status === 403 ? 401 : 400;
+            return Response.json({ error: mapIdlecloudError(res.status, text) }, { status });
+          }
+          if (looksHtml(text)) {
+            return Response.json({ error: "中转站返回了异常页面，请检查地址" }, { status: 502 });
+          }
+          try {
+            const img = extractImageBuffer(buf);
+            return Response.json({ image: img.toString("base64"), seed });
+          } catch {
+            /* job json */
+          }
+          const j = parseJob(text);
+          if (!j) return Response.json({ error: "中转站返回无法解析" }, { status: 502 });
+          if (j.error && !j.job_id) return Response.json({ error: j.error }, { status: 400 });
+          if (typeof j.image === "string" && j.image.length > 80) {
+            const b64 = j.image.includes("base64,") ? j.image.split("base64,").pop()! : j.image;
+            return Response.json({ image: b64, seed });
+          }
+          if (j.image_url) {
+            const img = await fetchImage(base, key, j.image_url);
+            return Response.json({ image: img.toString("base64"), seed });
+          }
+          if (!j.job_id) return Response.json({ error: "中转站没有返回任务" }, { status: 502 });
+          return Response.json({
+            job_id: j.job_id,
+            status_url: j.v5_delivery?.status_url,
+            seed,
+          });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "生图失败";
+          if (/aborted|timeout/i.test(msg)) {
+            return Response.json({ error: "生图超时，请稍后重试" }, { status: 504 });
+          }
+          return Response.json({ error: msg }, { status: 500 });
+        }
+      },
+    },
+  },
+});

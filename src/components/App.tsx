@@ -36,6 +36,7 @@ function Shell() {
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#1a1714" : "#F3EEE6");
   }, [theme]);
 
   let body: React.ReactNode;

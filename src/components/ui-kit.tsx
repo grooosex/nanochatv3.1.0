@@ -367,15 +367,15 @@ export function Modal({
 }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[70] flex items-start justify-center px-5 pt-[12vh]">
+    <div className="fixed inset-0 z-[70] flex items-start justify-center px-5 pt-[12vh] pb-[max(16px,env(safe-area-inset-bottom))]">
       <button className="absolute inset-0 bg-overlay" onClick={onClose} aria-label="关闭" />
       <div
         className={cn(
-          "relative w-full overflow-auto rounded-[24px] bg-bg p-5 shadow-2xl",
+          "relative max-h-[calc(100dvh-12vh-16px-env(safe-area-inset-bottom))] w-full overflow-y-auto overscroll-contain rounded-[24px] bg-bg shadow-2xl scroll-thin",
           wide ? "max-w-lg" : "max-w-sm",
         )}
       >
-        <div className={cn("mb-4 flex items-center", hideClose ? "" : "justify-between")}>
+        <div className={cn("sticky top-0 z-10 flex items-center bg-bg px-5 pt-5 pb-4", hideClose ? "" : "justify-between")}>
           <h2 className="text-[18px] font-semibold">{title}</h2>
           {!hideClose && (
             <IconBtn onClick={onClose} className="size-9">
@@ -383,7 +383,7 @@ export function Modal({
             </IconBtn>
           )}
         </div>
-        {children}
+        <div className="px-5 pb-5">{children}</div>
       </div>
     </div>
   );

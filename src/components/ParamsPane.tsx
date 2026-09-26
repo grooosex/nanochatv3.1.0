@@ -424,12 +424,14 @@ export function ParamsPane({ chat, mode = "chat" }: { chat: Chat; mode?: "chat" 
               自定义位置
             </button>
           </div>
-          {p.characters.map((ch, i) => (
+          {p.characters.map((ch, i) => {
+            const role = chat.characters.find((c) => c.id === ch.id) ?? chat.characters[i];
+            return (
             <CharCard
               key={ch.id}
               ch={ch}
               index={i}
-              chatName={chat.name}
+              name={(role?.name || ch.name || "").trim()}
               suggest={p.tagSuggest}
               useCoords={p.useCoords}
               onChange={(next) => patch({ characters: p.characters.map((x) => (x.id === ch.id ? next : x)) })}
@@ -461,7 +463,8 @@ export function ParamsPane({ chat, mode = "chat" }: { chat: Chat; mode?: "chat" 
                 })
               }
             />
-          ))}
+            );
+          })}
           <button
             type="button"
             className="mt-1 flex items-center gap-1 px-2 py-2 text-[13px] text-primary"
@@ -493,7 +496,7 @@ export function ParamsPane({ chat, mode = "chat" }: { chat: Chat; mode?: "chat" 
 function CharCard({
   ch,
   index,
-  chatName,
+  name,
   suggest,
   useCoords,
   onChange,
@@ -503,7 +506,7 @@ function CharCard({
 }: {
   ch: CharacterPrompt;
   index: number;
-  chatName: string;
+  name: string;
   suggest: boolean;
   useCoords: boolean;
   onChange: (c: CharacterPrompt) => void;
@@ -511,7 +514,7 @@ function CharCard({
   onApplyLook?: () => void;
   onRemove?: () => void;
 }) {
-  const title = `角色${index + 1}:${ch.name || chatName || ""}`;
+  const title = name ? `角色${index + 1}:${name}` : `角色${index + 1}`;
   return (
     <Card className="mb-3 overflow-visible">
       <div className="mb-2 flex items-center justify-between gap-2">

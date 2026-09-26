@@ -1,12 +1,12 @@
 import { grokOnce, grokStream } from "./grok-client";
-import { chatContextBlock, fieldPolishHint, groupFormatHint, IMAGE_BG_RULES, IMAGE_MULTI_RULES, IMAGE_SHOT_RULES, imageApplyRules, imageLengthRules, imageWriteMaxTokens, roleSnapshot, splitChatPrompt, statusBarFor, voicePolishExtra } from "./prompts";
+import { chatContextBlock, fieldPolishHint, groupFormatHint, IMAGE_BG_RULES, IMAGE_MULTI_RULES, IMAGE_SHOT_RULES, imageApplyRules, imageLengthRules, imageWriteMaxTokens, multiInsertInstruction, roleSnapshot, splitChatPrompt, statusBarFor, voicePolishExtra } from "./prompts";
 import { buildPolishUserContent, extractFieldText, parsePolishJson, stripRoleOutput } from "./role-polish";
 import { formatUserForChat } from "./user-markup";
 import { stripSpeakerPrefix } from "./rp-text";
 import { replyContextText } from "./reply-markup.ts";
 import { resolveImageWrite, imageWriteFields } from "./image-ai.ts";
 import { buildNaiPayload } from "./nai";
-import { sanitizeNaiTags, assignCharTags, extractJsonObject, resolveAbsentIds } from "./nai-tags";
+import { sanitizeNaiTags, assignCharTags, extractJsonObject, resolveAbsentIds, presenceFromTags, legacyPresentIds } from "./nai-tags";
 import { IMAGE_GEN_TIMEOUT_MS, RECENT_TURNS } from "./constants";
 import { saveBlob, useApp } from "./store";
 import { presetStyle } from "./st-preset";
@@ -158,26 +158,24 @@ export function nextFoldSlice(chat: Chat) {
 
 function imageBrief(
   chat: Chat,
-  opts: { shot?: string; residual?: string; last?: string; prevScene?: string },
+  opts: { shot?: string; residual?: string; last?: string; prevScene?: string; turnUser?: string },
 ) {
   const names = chat.characters.map((c) => c.name).filter(Boolean).join("、");
-  const roster = chat.characters
-    .map((c, i) => `${i + 1}. ${c.name || `角色${i + 1}`}`)
-    .join("\n");
   const insert = chat.isMulti && chat.promptMode === "insert";
   const format = insert
-    ? `输出 JSON（不要 markdown）：{"base":"地点写最前，然后人数场景镜头光线","chars":{${chat.characters.map((c) => `"${c.name || c.id}":"..."`).join(",")}},"absent":[]}
-chars 的键必须逐字用上面的角色名。不在镜头的角色放进 absent，不要写进 chars。没人离开则 absent 为 []。`
+    ? multiInsertInstruction(chat.characters, "brief")
     : chat.isMulti
-      ? "只输出英文 tag 一行，地点写最前，用 char1: ... char2: ... 区分。禁止 JSON，禁止 ENABLED。"
+      ? "只输出英文 tag 一行，地点写最前。只给在场的人写 char1: ... char2: ...，不在场的整段省略。禁止 JSON，禁止 ENABLED。"
       : "只输出英文 tag 一行，地点写最前。禁止 JSON。";
   const shot = (opts.shot || "").trim();
   const residual = (opts.residual || opts.last || "").trim();
+  const turnUser = chat.isMulti
+    ? `这一轮用户（只用来判断谁在场；姿势、动作、衣服仍只认本镜）：\n${(opts.turnUser || "").trim() || "（无）"}\n\n`
+    : "";
   return `角色：${names || "（未命名）"}
 外貌已由用户写好，不要重复（含发色瞳色体型种族整套衣服）。
 成人提示词加强：${chat.adultBoost ? "开" : "关"}
 多人：${chat.isMulti ? "是" : "否"}　插入模式：${chat.promptMode}
-${chat.isMulti ? `角色名单：\n${roster}` : ""}
 
 ${IMAGE_SHOT_RULES}
 
@@ -194,7 +192,7 @@ ${imageLengthRules(chat.imageParams.model, chat.adultBoost)}
 本镜（姿势、镜头、正在做的事只认这段）：
 ${shot || "（无）"}
 
-${chat.memory.trim() ? `长期记忆（只继承没被推翻的状态，不含地点）：\n${chat.memory.trim()}\n` : ""}残留参考（不要继承已结束的动作/体位/朝向）：
+${turnUser}${chat.memory.trim() ? `长期记忆（只继承没被推翻的状态，不含地点）：\n${chat.memory.trim()}\n` : ""}残留参考（不要继承已结束的动作/体位/朝向，也不要用它决定谁在场）：
 ${residual || "（无）"}
 
 上一镜地点（对白看不出人在哪时才用，只借人所在的地方）：
@@ -206,11 +204,13 @@ ${format}`;
 export function parseImageTagOutput(
   text: string,
   chat: Chat,
-): { base: string; chars: Record<string, string>; absent: string[] } {
+): { base: string; chars: Record<string, string>; absent: string[]; presence?: import("./nai-tags").PresenceUpdate } {
   const insert = chat.isMulti && chat.promptMode === "insert";
-  const roster = chat.imageParams.characters.length
-    ? chat.imageParams.characters.map((c) => ({ id: c.id, name: c.name || "" }))
-    : chat.characters.map((c) => ({ id: c.id, name: c.name || "" }));
+  const slots = chat.imageParams.characters.length ? chat.imageParams.characters : chat.characters;
+  const roster = slots.map((c) => {
+    const role = chat.characters.find((r) => r.id === c.id);
+    return { id: c.id, name: (role?.name || c.name || "").trim() };
+  });
 
   const json = extractJsonObject(text);
   if (json && (json.base != null || json.chars != null)) {
@@ -222,14 +222,25 @@ export function parseImageTagOutput(
     const { mapped, leftover } = assignCharTags(rawChars, roster);
     const base = sanitizeNaiTags([String(json.base || ""), leftover].filter(Boolean).join(", "));
     const absent = resolveAbsentIds(json.absent, roster);
+    const presence = presenceFromTags(Object.keys(mapped), absent);
     if (!insert) {
-      const extras = Object.values(mapped).filter(Boolean);
-      return { base: sanitizeNaiTags([base, ...extras].filter(Boolean).join(", ")), chars: {}, absent: [] };
+      const absentSet = new Set(absent);
+      const extras = Object.entries(mapped)
+        .filter(([id]) => !absentSet.has(id))
+        .map(([, tags]) => tags)
+        .filter(Boolean);
+      return { base: sanitizeNaiTags([base, ...extras].filter(Boolean).join(", ")), chars: {}, absent, presence };
     }
-    return { base, chars: mapped, absent };
+    return { base, chars: mapped, absent, presence };
   }
 
-  return { base: sanitizeNaiTags(text.replace(/\n/g, ", ")), chars: {}, absent: [] };
+  const legacy = chat.isMulti ? legacyPresentIds(text, roster) : undefined;
+  return {
+    base: sanitizeNaiTags(text.replace(/\n/g, ", ")),
+    chars: {},
+    absent: [],
+    presence: legacy ? { mode: "exact" as const, ids: legacy } : undefined,
+  };
 }
 
 export async function writeImageTags(
@@ -239,6 +250,7 @@ export async function writeImageTags(
   shotText?: string,
   prevScene?: string,
   signal?: AbortSignal,
+  turnUser?: string,
 ) {
   const extra = [
     chat.adultBoost
@@ -255,7 +267,7 @@ export async function writeImageTags(
   const payload: Record<string, unknown> = {
     task: "image",
     extraSystem: extra,
-    messages: [{ role: "user", content: imageBrief(chat, { shot: shotText, residual: lastText, prevScene }) }],
+    messages: [{ role: "user", content: imageBrief(chat, { shot: shotText, residual: lastText, prevScene, turnUser }) }],
     max_tokens: imageWriteMaxTokens(chat.imageParams.model),
     ...imageWriteFields(imageModelId),
   };

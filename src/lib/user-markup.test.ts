@@ -9,6 +9,7 @@ import {
   parseUserMarkup,
   previousRoundImagePrompt,
   shotAndResidual,
+  latestUserBefore,
 } from "./user-markup.ts";
 
 describe("parseUserMarkup", () => {
@@ -107,6 +108,17 @@ describe("shotAndResidual", () => {
     assert.match(shot, /她坐着/);
     assert.match(residual, /在吗/);
     assert.doesNotMatch(residual, /旁白收束/);
+  });
+
+  it("presence uses the latest user line, not the opening cue", () => {
+    const messages = [
+      { id: "u0", role: "user", content: OPENING_USER },
+      { id: "a0", role: "assistant", content: "七实在玄关等你" },
+      { id: "u1", role: "user", content: "雨村今天不来" },
+      { id: "a1", role: "assistant", content: "七实把枕头压上来" },
+    ];
+    assert.match(latestUserBefore(messages, "a1"), /雨村今天不来/);
+    assert.equal(latestUserBefore(messages, "a0"), "");
   });
 });
 

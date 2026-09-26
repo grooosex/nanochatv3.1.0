@@ -155,7 +155,20 @@ export function RoleEditor({ chat, mode }: { chat: Chat; mode: "create" | "edit"
       busy={busy?.kind === "field" && busy.key === "name" && busy.charId === char.id}
       locked={locked}
       onChange={(v) =>
-        patch({ characters: chat.characters.map((c) => (c.id === char.id ? { ...c, name: v } : c)) })
+        useApp.getState().patchChat(chat.id, (c) => {
+          const characters = c.characters.map((x) => (x.id === char.id ? { ...x, name: v } : x));
+          return {
+            ...c,
+            characters,
+            imageParams: {
+              ...c.imageParams,
+              characters: c.imageParams.characters.map((slot) =>
+                slot.id === char.id ? { ...slot, name: v } : slot,
+              ),
+            },
+            updatedAt: Date.now(),
+          };
+        })
       }
       onRegen={() => runField("name", char.id)}
       onPersonal={() => openPersonalize("name", char.id)}

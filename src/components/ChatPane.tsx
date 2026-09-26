@@ -744,11 +744,14 @@ export function CustomPromptModal() {
           </p>
           <div className="mb-1 text-[13px] font-medium">总提示（正面提示词 · 中）</div>
           <TextArea className="min-h-[96px]" value={text} onChange={(e) => setText(e.target.value)} />
-          {chars.map((ch, i) => (
+          {chars.map((ch, i) => {
+            const role = chat.characters.find((c) => c.id === ch.id);
+            const name = (role?.name || ch.name || "").trim();
+            return (
             <div key={ch.id} className="mt-3">
               <div className="mb-1 text-[13px] font-medium">
                 角色{i + 1}
-                {ch.name ? `:${ch.name}` : ""} 正面提示词
+                {name ? `:${name}` : ""} 正面提示词
               </div>
               <TextArea
                 className="min-h-[88px]"
@@ -756,7 +759,8 @@ export function CustomPromptModal() {
                 onChange={(e) => setCharTails((prev) => ({ ...prev, [ch.id]: e.target.value }))}
               />
             </div>
-          ))}
+            );
+          })}
         </>
       ) : (
         <TextArea className="min-h-[160px]" value={text} onChange={(e) => setText(e.target.value)} />

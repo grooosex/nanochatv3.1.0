@@ -13,6 +13,7 @@ import { cloneChat } from "./archive";
 import { syncCharsFromRole } from "./nai";
 import type {
   AppearancePreset,
+  Character,
   CharacterCard,
   Chat,
   FavoriteItem,
@@ -27,6 +28,26 @@ import { normalizeChatMemory } from "./chat-memory";
 import { uid, sortHistoryNewestFirst } from "./utils";
 import { migrateFavorite, presetNameFrom } from "./presets";
 import { settleStuckImages } from "./image-status";
+
+function copyRoleBody(dst: Character, src: Character): Character {
+  return {
+    ...dst,
+    persona: src.persona,
+    speech: src.speech,
+    appearance: src.appearance,
+    personaVoices: src.personaVoices ?? dst.personaVoices,
+    extras: src.extras ?? dst.extras,
+  };
+}
+
+function mergeCardCharacters(current: Character[], incoming: Character[]): Character[] {
+  const next = current.map((ch, i) => (incoming[i] ? copyRoleBody(ch, incoming[i]) : ch));
+  for (let i = current.length; i < incoming.length; i++) {
+    const src = incoming[i];
+    if (src) next.push({ ...src });
+  }
+  return next;
+}
 
 type Toast = { id: number; text: string };
 
@@ -561,19 +582,20 @@ export const useApp = create<State>((set, get) => ({
 
   applyCard: (chatId, card, charIndex) => {
     get().patchChat(chatId, (c) => {
-      if (c.isMulti && !card.isMulti && charIndex != null) {
-        const chars = c.characters.map((ch, i) =>
-          i === charIndex
-            ? {
-                ...ch,
-                ...card.characters[0],
-                id: ch.id,
-                extras: card.characters[0]?.extras ?? ch.extras,
-              }
-            : ch,
-        );
-        return { ...c, characters: chars };
+      const oneSlot = c.isMulti && !card.isMulti && charIndex != null;
+      if (oneSlot) {
+        const src = card.characters[0];
+        const characters = src
+          ? c.characters.map((ch, i) => (i === charIndex ? copyRoleBody(ch, src) : ch))
+          : c.characters;
+        return {
+          ...c,
+          characters,
+          imageParams: syncCharsFromRole(c.imageParams, characters, c.isMulti),
+          updatedAt: Date.now(),
+        };
       }
+      const characters = mergeCardCharacters(c.characters, card.characters);
       return {
         ...c,
         isMulti: card.isMulti,
@@ -583,13 +605,9 @@ export const useApp = create<State>((set, get) => ({
         statusBarOn: card.statusBarOn,
         statusBar: card.statusBar,
         grokModelId: card.grokModelId,
-        characters: structuredClone(card.characters).map((ch, i) => ({
-          ...ch,
-          id: c.characters[i]?.id ?? ch.id,
-        })),
-        name: card.isMulti
-          ? card.characters.map((x) => x.name).filter(Boolean).join("、")
-          : card.characters[0]?.name || card.name,
+        characters,
+        imageParams: syncCharsFromRole(c.imageParams, characters, card.isMulti),
+        updatedAt: Date.now(),
       };
     });
     get().toast(`已应用「${card.name}」`);

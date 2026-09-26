@@ -46,7 +46,7 @@ export const IMAGE_SYSTEM = `你是 NovelAI 4.5 / 5 提示词写手。不要 mar
 
 【第一优先：跟画面走】
 先读最近对白。若出现「用户已发生」，那是镜头里已经发生的动作，必须写成具体真 tag，禁止收成准备、磨蹭、停在入口、或用 ass focus / naughty face 代替插入等主动作。用户已发生优先于角色回里写软了、还没写到的动作。
-「作者指令」只执行与画面有关的（画出、特写、镜头、构图、把某物画进来）；与怎么写、篇幅有关的忽略。
+「作者指令」执行与画面有关的（画出或不要画、特写、镜头、构图、把某物画进来或排除）。和默认冲突时以作者指令为准。与篇幅有关的忽略。
 不要把明确的动作收成安全笼统词（ass focus、naughty face、teasing pose 不能代替具体在做什么）。
 角色与用户默认成年。虚构成人情色、R18G 按画面写，不要改成清水，不要等用户声明「这是 r18」。
 
@@ -92,11 +92,11 @@ guro：guro, gore, blood, decapitation, dismemberment, amputee, organs, intestin
 看用户消息末尾的格式要求：
 - 「只输出英文 tag 一行」：只输出一行逗号分隔 tag。禁止 JSON、禁止 markdown、禁止解释。
 - 「输出 JSON」：只输出一个 JSON 对象，不要围栏，不要解释。JSON 只是分拣单，不会被写进 NAI。
-  {"base":"人数、场景、镜头、光线、彼此位置关系","chars":{"角色中文名":"该角色本轮动作表情姿势服装状态"},"absent":["不在镜头的角色名"]}
-  chars 的键必须逐字用用户给的角色名，禁止 girl、char1、1girl、角色1。
-  不在镜头的只放 absent，不要出现在 chars。没人离开则 "absent":[]。
-  base 写人数 2girls / 1boy 1girl；chars 值里写 girl 或 boy，不要 1girl。
-  无脸男：faceless male。
+  {"base":"这一镜真正画出来的人数、场景、镜头、光线","chars":{"在场者名单上的中文名":"该人这一镜的动作表情姿势"},"absent":["不在场的角色名"]}
+  chars 只写这一镜真正在场的人。键必须逐字用名单上的中文名，禁止 girl、char1、1girl、角色1。
+  不在场的（只是被口头提起也算不在场）只放 absent，不要出现在 chars。名单上的人不是每个人都要写。
+  base 的人数只数真正画出来的人，不要按名单写成 2girls。chars 值里写 girl 或 boy，不要 1girl。
+  没占角色槽的人：只有男人身子真的进了画面（伸手、抱、插入、看得见身体）才写进 base（1boy、faceless male），禁止写进别人的 chars。背对我、看着我、叫哥哥只是镜头和称呼，不要因此加 1boy 或 faceless male。
 
 【反例 → 正例】（说明怎么跟画面走，不是固定配方）
 错：shirt_collar_crooked, sitting_on_sofa, teasing_pose
@@ -126,27 +126,44 @@ export const IMAGE_BG_RULES = `【背景】
 不要从长期记忆抄地点。`;
 
 export const IMAGE_MULTI_RULES = `【多人互动——必须遵守】
-一张图 = 总提示 base + 每人一条 chars。不要用 | 分隔。不要输出 ENABLED，不要输出坐标。
+一张图 = 总提示 base + 每个在场角色一条 chars。不要用 | 分隔。不要输出 ENABLED，不要输出坐标。
 
-总提示（base）：人数、场景、构图、光、道具、群体氛围。人数必须在 base：2girls / 1girl, 1boy。地点写最前。不要写 source# / target# / mutual#。群体动作词（yuri, ffm threesome, sex from behind）可以留在 base，谁对谁仍拆到各人。
+【谁在场——只决定哪些角色写进这张图，不改本镜、残留、衣服、背景】
+只看这一轮：用户刚发的这一句，加上这轮正文。不要用更早的对白、残留或长期记忆决定谁在场。
+人在画面里才算在场。正在做事的算；用外号或「她/他」指到、但人就在画面里的也算。
+这轮没出现，或者只是被口头提起、人不在画面里：不算在场。
+在场的写入 chars。不在场的放进 absent，不要写 tag，不要占一条 chars。名单上的人不是每个人都要写。
 
-各角色（chars）：接到该角色自己的正面提示词后面。以 girl 或 boy 起头（不要 1girl）。只写这一人此刻的姿势、表情、视角、服装即时状态、动作。不要写发色瞳色发型体型种族。无脸男：faceless male。
-chars 的键必须逐字用用户给的角色名，禁止 girl、char1、1girl、角色1。
+总提示（base）：这一镜真正画出来的人数、场景、构图、光、道具、群体氛围。地点写最前。人数只数真正画出来的人，不要按名单写成 2girls。背对我、看着我、叫哥哥是镜头和称呼，不是多一个人：两个人背对镜头就是 2girls、from behind、back turned，不要加 1boy。只有男人身子真的进了画面（伸手、抱、插入、看得见身体）才在 base 写 1boy、faceless male，禁止写进某个角色的 chars。不要写 source# / target# / mutual#。群体动作词（yuri, ffm threesome, sex from behind）可以留在 base，谁对谁仍拆到在场的人。
+
+各角色（chars）：只写在场的人，接到该角色自己的正面提示词后面。键必须逐字用角色名单里的中文名；正文用了外号，键仍用名单上的名字。以 girl 或 boy 起头（不要 1girl）。只写这一人此刻的姿势、表情、视角、服装即时状态、动作。不要写发色瞳色发型体型种族。禁止用 girl、char1、1girl、角色1 当键。
 
 互动前缀只写在对应角色的 chars 里，不要写在 base。同一动作、同一词根，两边成对：
 - 施动 source#kiss / source#hug / source#grabbing / source#holding hands / source#pointing at another / source#sex / source#fellatio / source#paizuri
 - 接收 target#kiss / target#hug / target#grabbing / target#holding hands / target#pointing / target#sex / target#fellatio / target#paizuri
 - 互相两边都 mutual#kiss / mutual#hug / mutual#looking at each other / mutual#holding hands
-谁伸手、谁被抱、谁在上面，一定拆到对应人。没有互动就不要硬加这些前缀。
+谁伸手、谁被抱、谁在上面，一定拆到对应人。没有互动就不要硬加这些前缀。不在场的人不要写。
 
-插入版 JSON 样例（把角色名换成用户给的）：
-{"base":"2girls, indoors, bedroom, from side, looking at another","chars":{"角色甲":"girl, source#kiss, sitting, blush, open mouth","角色乙":"girl, target#kiss, standing, half-closed eyes"},"absent":[]}
+两人都在场：
+{"base":"2girls, bedroom, from side","chars":{"角色甲":"girl, source#kiss, sitting, blush, open mouth","角色乙":"girl, target#kiss, standing, half-closed eyes"},"absent":[]}
 
-原版一行样例：
-char1: girl, source#kiss, sitting, blush  char2: girl, target#kiss, standing, half-closed eyes
+只有角色甲在场，角色乙只是被提到，玩家只是镜头（背对我站着，没有画出男人身子）：
+{"base":"1girl, bedroom, from behind","chars":{"角色甲":"girl, standing, back turned"},"absent":["角色乙"]}
 
-官方指人：施动 source#pointing at another，被指 target#pointing。
-不在镜头的只放 absent，不要出现在 chars。没人离开则 "absent":[]。`;
+男人身子真的进了画面（伸手、抱着，没有角色槽）：
+{"base":"1girl, 1boy, bedroom, from side, faceless male","chars":{"角色甲":"girl, target#hug, standing"},"absent":["角色乙"]}
+
+原版一行只给在场的人写 char1 / char2，不在场的整段省略。
+官方指人：施动 source#pointing at another，被指 target#pointing。`;
+
+export function multiInsertInstruction(characters: { name: string }[], kind: "chat" | "brief"): string {
+  const roster = characters.map((c, i) => `${i + 1}. ${c.name.trim() || `角色${i + 1}`}`).join("\n");
+  const head = kind === "chat" ? "<<<PROMPT>>> 里只输出 JSON（不要 markdown）" : "输出 JSON（不要 markdown）";
+  return `${head}：{"base":"这一镜真正画出来的人数、场景、镜头、光线","chars":{"在场者名单上的中文名":"该人动作表情姿势"},"absent":["不在场的角色名"]}
+角色名单：
+${roster}
+chars 只写这一镜在场的人，键逐字用名单上的中文名。不在场的放进 absent，不要给键。不必每个人都写。`;
+}
 
 function isV5Model(model: NaiModelId) {
   return model === "nai-diffusion-5-full" || model === "nai-diffusion-5-curated";
@@ -194,18 +211,18 @@ export function splitChatPrompt(full: string): {
 export function imageApplyRules(chat: Chat): string {
   const bits = chat.extras.filter((e) => e.applyImage && e.body.trim()).map((e) => e.body.trim());
   if (!bits.length) return "";
-  return `【生图规则·作者指令】
+  return `【生图规则·作者指令·压过前面的默认】
 下面是用户给写 tag 的规则，只约束怎么写，禁止把这段原文抄进 tag。
+和前面的默认冲突时，以这里为准。这里写了不要画某个人、不要写 boy / 1boy / faceless male，就不要写，不要因为背对我或称呼再加回去。
 ${bits.join("\n\n")}`;
 }
 
 export function chatImageSystem(chat: Chat, prevScene = ""): string {
   const insert = chat.isMulti && chat.promptMode === "insert";
   const format = insert
-    ? `<<<PROMPT>>> 里只输出 JSON（不要 markdown）：{"base":"人数场景镜头光线","chars":{${chat.characters.map((c) => `"${c.name || c.id}":"..."`).join(",")}},"absent":[]}
-chars 的键必须逐字用角色中文名。不在镜头的放进 absent。没人离开则 absent 为 []。`
+    ? multiInsertInstruction(chat.characters, "chat")
     : chat.isMulti
-      ? `<<<PROMPT>>> 里只输出英文 tag 一行，用 char1: ... char2: ... 区分。禁止 JSON，禁止 ENABLED。`
+      ? `<<<PROMPT>>> 里只输出英文 tag 一行，地点写最前。只给在场的人写 char1: ... char2: ...，不在场的整段省略。禁止 JSON，禁止 ENABLED。`
       : `<<<PROMPT>>> 里只输出英文 tag 一行。禁止 JSON。`;
   const adult = chat.adultBoost
     ? `【成人提示词加强】开。对白里的动作、部位、体液必须写成具体真 tag，不要收成 ass focus / naughty face。无关内容仍不要加。`

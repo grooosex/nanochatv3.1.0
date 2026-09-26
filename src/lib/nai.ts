@@ -169,8 +169,8 @@ export function syncCharsFromRole(
     const prev = params.characters.find((c) => c.id === r.id);
     return {
       id: r.id,
-      name: r.name || prev?.name || "",
-      enabled: r.imageEnabled,
+      name: r.name,
+      enabled: prev ? prev.enabled : r.imageEnabled,
       prompt: prev?.prompt || r.prompt || r.appearance || "",
       uc: prev?.uc || r.uc || "",
       x: prev?.x ?? r.x ?? 0.5,

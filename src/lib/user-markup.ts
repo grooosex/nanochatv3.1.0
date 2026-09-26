@@ -119,6 +119,21 @@ export function shotAndResidual(
   };
 }
 
+/** The user's latest line before this reply. Who is on screen looks at this plus 本镜. */
+export function latestUserBefore(
+  messages: { id: string; role: string; content: string }[],
+  msgId: string,
+): string {
+  const idx = messages.findIndex((m) => m.id === msgId);
+  const before = idx >= 0 ? messages.slice(0, idx) : messages;
+  for (let i = before.length - 1; i >= 0; i--) {
+    if (before[i].role !== "user") continue;
+    const text = formatUserForImage(before[i].content).trim();
+    if (text) return text;
+  }
+  return "";
+}
+
 /** Immediate previous assistant/narrator only. Empty if that round has no successful image. */
 export function previousRoundImagePrompt(
   messages: { id: string; role: string; images?: { status: string; prompt?: string }[] }[],

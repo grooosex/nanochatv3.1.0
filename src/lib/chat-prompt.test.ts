@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { splitChatPrompt, chatImageSystem, IMAGE_SYSTEM, IMAGE_SHOT_RULES, IMAGE_BG_RULES, IMAGE_MULTI_RULES, PERSONA_VOICE_RULES, fieldPolishHint, voicePolishExtra, systemFor, statusBarSkeleton, chatContextBlock, imageApplyRules, imageLengthRules, imageTagBudget, imageWriteMaxTokens } from "./prompts.ts";
+import { assignCharTags, presenceFromTags, legacyPresentIds } from "./nai-tags.ts";
 import { settleStuckImages, imageFailText, prettyImageError } from "./image-status.ts";
 import { emptyCharacter, defaultImageParams } from "./constants.ts";
 import type { Chat } from "./types.ts";
@@ -156,6 +157,7 @@ describe("chatImageSystem", () => {
     const rules = imageApplyRules(chat);
     assert.match(rules, /不要画眼镜/);
     assert.match(rules, /禁止把这段原文抄进 tag/);
+    assert.match(rules, /以这里为准/);
     assert.doesNotMatch(rules, /这段只给聊天/);
     assert.match(chatImageSystem(chat), /不要画眼镜/);
     assert.equal(imageApplyRules(stub({ extras: [{ id: "a", body: "x" }] })), "");
@@ -178,11 +180,15 @@ describe("chatImageSystem", () => {
     assert.doesNotMatch(single, /source#kiss/);
     assert.doesNotMatch(single, /source#teasing/);
 
+    const a = emptyCharacter(1);
+    const b = emptyCharacter(2);
+    a.name = "七实";
+    b.name = "雨村";
     const multi = chatImageSystem(
       stub({
         isMulti: true,
         promptMode: "insert",
-        characters: [emptyCharacter(1), emptyCharacter(2)],
+        characters: [a, b],
       }),
     );
     assert.ok(multi.includes(IMAGE_SHOT_RULES));
@@ -193,6 +199,14 @@ describe("chatImageSystem", () => {
     assert.match(multi, /mutual#kiss/);
     assert.doesNotMatch(multi, /source#teasing/);
     assert.match(multi, /不要输出 ENABLED/);
+    assert.match(multi, /谁在场/);
+    assert.match(multi, /不要加 1boy/);
+    assert.match(multi, /背对我/);
+    assert.doesNotMatch(multi, /玩家在画面里但没有角色槽/);
+    assert.doesNotMatch(multi, new RegExp(`"${a.id}"`));
+    assert.doesNotMatch(multi, new RegExp(`"${b.id}"`));
+    assert.match(multi, /七实/);
+    assert.match(multi, /雨村/);
   });
 });
 
@@ -335,5 +349,31 @@ describe("stuck image + move folder order", () => {
       "请求太频繁",
     );
     assert.equal(prettyImageError("还没连接 NAI 中转站"), "还没连接 NAI 中转站");
+  });
+});
+
+describe("multi presence tags", () => {
+  const roster = [
+    { id: "a", name: "七实" },
+    { id: "b", name: "雨村" },
+  ];
+
+  it("does not dump leftover tags onto someone who was not named", () => {
+    const { mapped, leftover } = assignCharTags({ 七实: "girl, sleepy", extra: "faceless male" }, roster);
+    assert.equal(mapped.a, "girl, sleepy");
+    assert.equal("b" in mapped, false);
+    assert.match(leftover, /faceless male/);
+  });
+
+  it("turns the switch set to whoever was actually tagged", () => {
+    const present = presenceFromTags(["a", "b"], ["b"]);
+    assert.deepEqual(present, { mode: "exact", ids: ["a"] });
+    assert.deepEqual(presenceFromTags([], ["b"]), { mode: "off", ids: ["b"] });
+    assert.equal(presenceFromTags([], []), undefined);
+  });
+
+  it("reads legacy char slots without inventing the missing one", () => {
+    assert.deepEqual(legacyPresentIds("bedroom, char1: girl, sleepy", roster), ["a"]);
+    assert.equal(legacyPresentIds("bedroom, 1girl", roster), undefined);
   });
 });

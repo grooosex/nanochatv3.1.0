@@ -18,10 +18,10 @@ import {
   writeImageTags,
 } from "@/lib/engine";
 import { grokStream } from "@/lib/grok-client";
-import { sanitizeNaiTags, extractGrokTail } from "@/lib/nai-tags";
+import { sanitizeNaiTags, extractGrokTail, type PresenceUpdate } from "@/lib/nai-tags";
 import { COOLDOWN_MS } from "@/lib/constants";
 import { useApp } from "@/lib/store";
-import { shotAndResidual, previousRoundImagePrompt } from "@/lib/user-markup";
+import { shotAndResidual, previousRoundImagePrompt, latestUserBefore } from "@/lib/user-markup";
 import { presetStyle } from "@/lib/st-preset";
 import { applySnaps, foldCoveredEnd, memoryCaughtUp, memoryFailReason, pushSnap, rewindSnaps } from "@/lib/chat-memory";
 import { chatImageSystem } from "@/lib/prompts";
@@ -316,7 +316,7 @@ export async function attachImage(
   mode: ImageGenSource = "auto",
   custom?: string,
   customChars?: Record<string, string>,
-  parsed?: { base: string; chars: Record<string, string>; absent: string[] },
+  parsed?: { base: string; chars: Record<string, string>; absent: string[]; presence?: PresenceUpdate },
   shotText?: string,
 ) {
   if (!imageOn()) return;
@@ -391,8 +391,8 @@ export async function attachImage(
     if (mode !== "custom") {
       if (parsed) {
         grokTail = parsed.base;
-        charTails = mapCharTails(c, parsed.chars);
-        applyAbsent(id, parsed.absent);
+        charTails = keepPresentTails(mapCharTails(c, parsed.chars), parsed.presence);
+        applyPresence(id, parsed.presence);
       } else if (mode === "same" && prev?.prompt) {
         grokTail = extractGrokTail(prev.prompt, c.imageParams);
         charTails = { ...(prev.charTails || {}) };
@@ -407,10 +407,11 @@ export async function attachImage(
           shot || msg.content,
           prevScene,
           ac.signal,
+          latestUserBefore(live.messages, msgId),
         );
         grokTail = tags.base;
-        charTails = mapCharTails(live, tags.chars);
-        applyAbsent(id, tags.absent);
+        charTails = keepPresentTails(mapCharTails(live, tags.chars), tags.presence);
+        applyPresence(id, tags.presence);
       }
     }
     if (!grokTail && !Object.keys(charTails).length) {
@@ -456,26 +457,42 @@ export async function attachImage(
 function mapCharTails(c: Chat, chars: Record<string, string>) {
   const map: Record<string, string> = {};
   for (const ch of c.imageParams.characters) {
+    const roleName = c.characters.find((r) => r.id === ch.id)?.name || "";
     const byId = chars[ch.id];
-    const byName = ch.name ? chars[ch.name] : "";
+    const byName = (ch.name && chars[ch.name]) || (roleName && chars[roleName]) || "";
     if (byId || byName) map[ch.id] = byId || byName;
   }
   return map;
 }
 
-function applyAbsent(id: string, absent: string[] | undefined) {
-  if (!absent?.length) return;
-  const off = new Set(absent);
-  patch(id, (ch) => ({
-    ...ch,
-    imageParams: {
-      ...ch.imageParams,
-      characters: ch.imageParams.characters.map((x) => ({
-        ...x,
-        enabled: !off.has(x.id) && !off.has(x.name),
-      })),
-    },
-  }));
+function keepPresentTails(charTails: Record<string, string>, presence?: PresenceUpdate) {
+  if (!presence) return charTails;
+  if (presence.mode === "exact") {
+    const on = new Set(presence.ids);
+    const next: Record<string, string> = {};
+    for (const [k, v] of Object.entries(charTails)) if (on.has(k)) next[k] = v;
+    return next;
+  }
+  const off = new Set(presence.ids);
+  const next = { ...charTails };
+  for (const id of off) delete next[id];
+  return next;
+}
+
+function applyPresence(id: string, presence?: PresenceUpdate) {
+  if (!presence) return;
+  patch(id, (ch) => {
+    const enabledOf = (slotId: string) =>
+      presence.mode === "exact" ? presence.ids.includes(slotId) : !presence.ids.includes(slotId);
+    return {
+      ...ch,
+      characters: ch.characters.map((role) => ({ ...role, imageEnabled: enabledOf(role.id) })),
+      imageParams: {
+        ...ch.imageParams,
+        characters: ch.imageParams.characters.map((x) => ({ ...x, enabled: enabledOf(x.id) })),
+      },
+    };
+  });
 }
 
 function setMemoryHint(

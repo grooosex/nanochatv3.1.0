@@ -191,14 +191,7 @@ export function assignCharTags(
       used.add(id);
     } else unmatched.push(tags);
   }
-  let i = 0;
-  for (const c of characters) {
-    if (used.has(c.id)) continue;
-    if (i >= unmatched.length) break;
-    mapped[c.id] = unmatched[i++];
-    used.add(c.id);
-  }
-  return { mapped, leftover: unmatched.slice(i).join(", ") };
+  return { mapped, leftover: unmatched.join(", ") };
 }
 
 export function resolveAbsentIds(
@@ -217,6 +210,31 @@ export function resolveAbsentIds(
         return m ? characters[Number(m[1]) - 1] : undefined;
       })();
     if (hit && !ids.includes(hit.id)) ids.push(hit.id);
+  }
+  return ids;
+}
+
+export type PresenceUpdate = { mode: "exact"; ids: string[] } | { mode: "off"; ids: string[] };
+
+export function presenceFromTags(mappedIds: string[], absentIds: string[]): PresenceUpdate | undefined {
+  if (mappedIds.length) {
+    const absent = new Set(absentIds);
+    return { mode: "exact", ids: mappedIds.filter((id) => !absent.has(id)) };
+  }
+  if (absentIds.length) return { mode: "off", ids: absentIds };
+  return undefined;
+}
+
+export function legacyPresentIds(text: string, characters: { id: string }[]): string[] | undefined {
+  const found = new Set<number>();
+  const re = /\bchar(?:acter)?\s*(\d+)\s*:/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) found.add(Number(m[1]));
+  if (!found.size) return undefined;
+  const ids: string[] = [];
+  for (const n of [...found].sort((a, b) => a - b)) {
+    const c = characters[n - 1];
+    if (c && !ids.includes(c.id)) ids.push(c.id);
   }
   return ids;
 }

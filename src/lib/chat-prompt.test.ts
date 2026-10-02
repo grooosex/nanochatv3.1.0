@@ -163,6 +163,20 @@ describe("chatImageSystem", () => {
     assert.equal(imageApplyRules(stub({ extras: [{ id: "a", body: "x" }] })), "");
   });
 
+  it("keeps an unlit 新增 in 补丁 and lifts a lit one out", () => {
+    const block = chatContextBlock(
+      stub({
+        extras: [
+          { id: "a", body: "平时正常写" },
+          { id: "b", body: "每轮都要有说话", emphasize: true },
+        ],
+      }),
+    );
+    assert.match(block, /【补丁】/);
+    assert.match(block, /平时正常写/);
+    assert.doesNotMatch(block, /每轮都要有说话/);
+  });
+
   it("labels appearance as chat proofreading, not an image base", () => {
     const block = chatContextBlock(
       stub({ characters: [{ ...emptyCharacter(1), appearance: "pink hair, sailor" }] }),

@@ -335,7 +335,7 @@ export const MEMORY_SYSTEM = `把更早的角色扮演对白压成一份「剧�
 已经发生的性行为和重要身体接触必须记作经历和事实（例如曾经肛交过），不要因为动作结束就抹掉。不要把已结束的动作写成「正在做」（现在在客厅说话，就不要写成正趴着后入）。
 丢掉：被后来剧情明确推翻的旧事实、纯气氛修辞、重复对白。
 不要写文笔赏析。不要发明没发生的事。不要对话体复读。不要建议下一句。不要提到「这是记忆」。
-若已有上一份备忘，以它为底把新这一截叠上去；冲突以新这一截为准，仍有效的旧事实不要丢。
+若已有上一份备忘，以它为底把新这一截叠上去；冲突以新这一截为准，仍有效的旧事实不要丢。注意这不是补篇、补记或续写，是把上一份备忘和这一截新对白结合成一份完整的剧情备忘(涵盖从第一轮开始的内容)。
 只返回备忘正文。`;
 
 export const PROMPT_REWRITE_SYSTEM = `根据对话和上一份提示词，重写一份 NAI 4.5/5 英文 tag。规则同生图写手：先把对白里的主动作写成具体真 tag，空格不分下划线，不写画风画师质量词外貌。成人加强开时写成具体真 tag，不要收成安全词。完全无关的情色不要硬塞。只输出 tag 行，不要解释。`;
@@ -461,6 +461,7 @@ export function chatContextBlock(chat: Chat, opts?: { regen?: boolean }): string
     .map((c, i) => characterBlock(c, chat.isMulti ? i + 1 : 0))
     .join("\n\n");
   const extras = [...chat.extras, ...chat.characters.flatMap((c) => c.extras)]
+    .filter((e) => !e.emphasize)
     .map((e, i) => `新增${i + 1}：${e.body}`)
     .filter((s) => s.length > 4)
     .join("\n");

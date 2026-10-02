@@ -688,9 +688,9 @@ function PreviewParamsDrawer({
                 <FolderIcon className="size-4" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1 truncate text-[14px] font-medium">
-                  {f.starred && <Star className="size-3 fill-primary text-primary" />}
-                  {f.name || "文件夹"}
+                <div className="flex min-w-0 items-center gap-1 text-[14px] font-medium">
+                  {f.starred && <Star className="size-3 shrink-0 fill-primary text-primary" />}
+                  <span className="min-w-0 truncate">{f.name || "文件夹"}</span>
                 </div>
                 <div className="text-[12px] text-muted">{inFolder(f.id).length} 项</div>
               </div>
@@ -711,9 +711,9 @@ function PreviewParamsDrawer({
               >
                 <ChatAvatar chat={c} size={40} />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1 truncate text-[14px] font-medium">
-                    {c.starred && <Star className="size-3 fill-primary text-primary" />}
-                    {c.name || "未命名"}
+                  <div className="flex min-w-0 items-center gap-1 text-[14px] font-medium">
+                    {c.starred && <Star className="size-3 shrink-0 fill-primary text-primary" />}
+                    <span className="min-w-0 truncate">{c.name || "未命名"}</span>
                   </div>
                   <div className="truncate text-[12px] text-muted">{chatSnippet(c)}</div>
                 </div>

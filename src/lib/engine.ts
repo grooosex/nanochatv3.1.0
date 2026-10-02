@@ -1,13 +1,13 @@
 import { grokOnce, grokStream } from "./grok-client";
 import { chatContextBlock, fieldPolishHint, groupFormatHint, IMAGE_BG_RULES, IMAGE_MULTI_RULES, IMAGE_SHOT_RULES, imageApplyRules, imageLengthRules, imageWriteMaxTokens, multiInsertInstruction, roleSnapshot, splitChatPrompt, statusBarFor, voicePolishExtra } from "./prompts";
 import { buildPolishUserContent, extractFieldText, parsePolishJson, stripRoleOutput } from "./role-polish";
-import { formatUserForChat } from "./user-markup";
+import { formatUserForChat, standingDirectives } from "./user-markup";
 import { stripSpeakerPrefix } from "./rp-text";
 import { replyContextText } from "./reply-markup.ts";
 import { resolveImageWrite, imageWriteFields } from "./image-ai.ts";
 import { buildIdlecloudBody, buildNaiPayload } from "./nai";
 import { sanitizeNaiTags, assignCharTags, extractJsonObject, resolveAbsentIds, presenceFromTags, legacyPresentIds } from "./nai-tags";
-import { IMAGE_GEN_TIMEOUT_MS, NAI_HOP_TIMEOUT_MS, NAI_POLL_MS, NAI_POLL_TRIES, RECENT_TURNS } from "./constants";
+import { IMAGE_DRAW_TIMEOUT_MS, IMAGE_GEN_TIMEOUT_MS, NAI_HOP_TIMEOUT_MS, NAI_POLL_MS, RECENT_TURNS } from "./constants";
 import { saveBlob, useApp } from "./store";
 import { presetStyle } from "./st-preset";
 import type { Chat, ChatMessage, GenImage, GrokModelId } from "./types";
@@ -43,14 +43,20 @@ export function foldWindow() {
 function historyMessages(chat: Chat, upto?: number) {
   const msgs = chat.messages.slice(0, upto ?? chat.messages.length);
   const start = Math.max(0, msgs.length - recentWindow());
-  const recent = msgs.slice(start);
-  return recent
-    .filter((m) => m.role !== "narrator" || m.content)
-    .map((m) => ({
+  const recent = msgs.slice(start).filter((m) => m.role !== "narrator" || m.content);
+  const standing = standingDirectives(chat);
+  let lastUser = -1;
+  for (let i = recent.length - 1; i >= 0; i--) {
+    if (recent[i].role === "user") {
+      lastUser = i;
+      break;
+    }
+  }
+  return recent.map((m, i) => ({
       role: m.role === "user" ? ("user" as const) : ("assistant" as const),
       content:
         m.role === "user"
-          ? formatUserForChat(m.content)
+          ? formatUserForChat(m.content, i === lastUser ? standing : [])
           : stripSpeakerPrefix(replyContextText(m.content), [
               m.characterName,
               chat.name,
@@ -393,29 +399,34 @@ export async function generateNai(opts: {
     return { blobId: saved.blobId, seed: built.seed, prompt: built.finalPrompt, blob: saved.blob };
   };
   const base = { baseUrl: opts.baseUrl, apiKey: opts.apiKey };
-  let submit: NaiHop;
-  try {
-    submit = await naiHop({ ...base, action: "submit", payload }, opts.signal);
-  } catch (e) {
-    if (isHopTimeout(e)) throw new Error("中转站超时，请稍后重试");
-    throw e;
+  const started = Date.now();
+  const timedOut = () => Date.now() - started >= IMAGE_DRAW_TIMEOUT_MS;
+  let submit: NaiHop | undefined;
+  while (!submit) {
+    if (timedOut()) throw new Error("生图超时");
+    try {
+      submit = await naiHop({ ...base, action: "submit", payload }, opts.signal);
+    } catch (e) {
+      if (isHopTimeout(e)) continue;
+      throw e;
+    }
   }
   if (submit.image) return finish(submit.image);
   if (!submit.jobId && !submit.statusUrl && !submit.fileUrl) throw new Error("中转站没有返回任务");
   let statusUrl = submit.statusUrl;
   let fileUrl = submit.fileUrl;
   let v5 = submit.v5;
-  for (let i = 0; i < NAI_POLL_TRIES; i++) {
+  while (!timedOut()) {
     if (fileUrl) {
       try {
         const fetched = await naiHop({ ...base, action: "fetch", fileUrl, v5 }, opts.signal);
         if (fetched.image) return finish(fetched.image);
       } catch (e) {
         if (!isHopTimeout(e)) throw e;
+        continue;
       }
       fileUrl = undefined;
     }
-    await sleepMs(NAI_POLL_MS, opts.signal);
     let poll: NaiHop;
     try {
       poll = await naiHop({ ...base, action: "poll", jobId: submit.jobId, statusUrl }, opts.signal);
@@ -428,7 +439,11 @@ export async function generateNai(opts: {
     if (poll.fileUrl) {
       fileUrl = poll.fileUrl;
       v5 = poll.v5;
+      continue;
     }
+    const left = IMAGE_DRAW_TIMEOUT_MS - (Date.now() - started);
+    if (left <= 0) break;
+    await sleepMs(Math.min(NAI_POLL_MS, left), opts.signal);
   }
   throw new Error("生图超时");
 }

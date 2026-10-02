@@ -21,7 +21,7 @@ import { grokStream } from "@/lib/grok-client";
 import { sanitizeNaiTags, extractGrokTail, type PresenceUpdate } from "@/lib/nai-tags";
 import { COOLDOWN_MS } from "@/lib/constants";
 import { useApp } from "@/lib/store";
-import { shotAndResidual, previousRoundImagePrompt, latestUserBefore } from "@/lib/user-markup";
+import { shotAndResidual, previousRoundImagePrompt, latestUserBefore, standingDirectives, formatUserForChat, OPENING_USER } from "@/lib/user-markup";
 import { presetStyle } from "@/lib/st-preset";
 import { applySnaps, foldCoveredEnd, memoryCaughtUp, memoryFailReason, pushSnap, rewindSnaps } from "@/lib/chat-memory";
 import { chatImageSystem } from "@/lib/prompts";
@@ -233,7 +233,7 @@ async function runReply(id: string, _userText: string | null, opening: boolean, 
   const prevScene = previousRoundImagePrompt(live.messages, placeholder.id);
   const msgs = historyMessages(live).filter((m) => m.content);
   if (opening && msgs.length === 0) {
-    msgs.push({ role: "user", content: "（开始场景，请角色先开口）" });
+    msgs.push({ role: "user", content: formatUserForChat(OPENING_USER, standingDirectives(live)) });
   }
 
   let raw = "";
@@ -398,7 +398,8 @@ export async function attachImage(
         charTails = { ...(prev.charTails || {}) };
       } else {
         const live = chat(id) ?? c;
-        const { shot, residual } = shotAndResidual(live.messages, msgId, shotText);
+        const standing = standingDirectives(live);
+        const { shot, residual } = shotAndResidual(live.messages, msgId, shotText, standing);
         const prevScene = previousRoundImagePrompt(live.messages, msgId);
         const tags = await writeImageTags(
           live,
@@ -407,7 +408,7 @@ export async function attachImage(
           shot || msg.content,
           prevScene,
           ac.signal,
-          latestUserBefore(live.messages, msgId),
+          latestUserBefore(live.messages, msgId, standing),
         );
         grokTail = tags.base;
         charTails = keepPresentTails(mapCharTails(live, tags.chars), tags.presence);

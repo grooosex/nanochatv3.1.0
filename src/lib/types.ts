@@ -40,6 +40,7 @@ export interface ExtraField {
   id: string;
   body: string;
   applyImage?: boolean;
+  emphasize?: boolean;
 }
 
 export interface Character {

@@ -465,9 +465,9 @@ function FolderRow({
           <FolderIcon className="size-4" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1 truncate text-[15px] font-medium">
-            {starred && <Star className="size-3 fill-primary text-primary" />}
-            {name}
+          <div className="flex min-w-0 items-center gap-1 text-[15px] font-medium">
+            {starred && <Star className="size-3 shrink-0 fill-primary text-primary" />}
+            <span className="min-w-0 truncate">{name}</span>
           </div>
           <div className="text-[12px] text-muted">{count} 项</div>
         </div>
@@ -550,9 +550,9 @@ function ChatRow({
       >
         <ChatAvatar chat={chat} dim={active && !ui.selectMode} />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1 truncate text-[15px] font-medium">
-            {chat.starred && <Star className="size-3 fill-primary text-primary" />}
-            {chat.name || "未命名"}
+          <div className="flex min-w-0 items-center gap-1 text-[15px] font-medium">
+            {chat.starred && <Star className="size-3 shrink-0 fill-primary text-primary" />}
+            <span className="min-w-0 truncate">{chat.name || "未命名"}</span>
           </div>
           <div className="truncate text-[12px] text-muted">{last || "新的对话"}</div>
         </div>

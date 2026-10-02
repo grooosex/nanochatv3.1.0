@@ -52,6 +52,17 @@ describe("formatUserForChat", () => {
     assert.doesNotMatch(CONTINUE_USER, /不能替/);
   });
 
+  it("appends a lit 强调 as 《》 without dropping a blank continue", () => {
+    const out = formatUserForChat("", ["每轮都要有说话"]);
+    assert.match(out, /没有发言/);
+    assert.match(out, /【作者指令】《每轮都要有说话》/);
+    assert.match(out, /听不见/);
+    const said = formatUserForChat("今天天气真好，要不要出去走走？", ["每轮都要有说话"]);
+    assert.match(said, /【用户其余原文】今天天气真好/);
+    assert.match(said, /《每轮都要有说话》/);
+    assert.equal(formatUserForChat("今天天气真好，要不要出去走走？"), "今天天气真好，要不要出去走走？");
+  });
+
   it("labels facts and forbids hearing them as orders", () => {
     const out = formatUserForChat("(屁眼插入阴茎)《阴茎也画出来》");
     assert.match(out, /【已发生】/);
@@ -81,6 +92,25 @@ describe("formatUserForImage", () => {
 
   it("drops the opening cue", () => {
     assert.equal(formatUserForImage(OPENING_USER), "");
+  });
+
+  it("gives the latest user line the same 《》 the chat sees", () => {
+    const standing = ["把表情画出来"];
+    const messages = [
+      { id: "u0", role: "user", content: "你好" },
+      { id: "a0", role: "assistant", content: "她点头" },
+      { id: "u1", role: "user", content: "坐下" },
+      { id: "a1", role: "assistant", content: "她坐下" },
+    ];
+    const latest = latestUserBefore(messages, "a1", standing);
+    assert.match(latest, /作者指令/);
+    assert.match(latest, /《把表情画出来》/);
+    assert.match(latest, /坐下/);
+    const { residual } = shotAndResidual(messages, "a1", undefined, standing);
+    assert.equal(residual.split("作者指令").length - 1, 1);
+    assert.match(residual, /用户其余：你好/);
+    assert.match(residual, /《把表情画出来》/);
+    assert.equal(formatUserForImage("今天天气真好，要不要出去走走？"), "用户：今天天气真好，要不要出去走走？");
   });
 });
 

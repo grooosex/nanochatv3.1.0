@@ -700,6 +700,19 @@ function Extras({ extras, onChange }: { extras: ExtraField[]; onChange: (e: Extr
               <button
                 type="button"
                 className={`rounded-full border px-2 py-0.5 text-[11px] leading-none transition ${
+                  e.emphasize
+                    ? "border-primary bg-primary text-on-primary"
+                    : "border-primary bg-transparent text-primary"
+                }`}
+                onClick={() =>
+                  onChange(extras.map((x) => (x.id === e.id ? { ...x, emphasize: !x.emphasize } : x)))
+                }
+              >
+                强调
+              </button>
+              <button
+                type="button"
+                className={`rounded-full border px-2 py-0.5 text-[11px] leading-none transition ${
                   e.applyImage
                     ? "border-primary bg-primary text-on-primary"
                     : "border-primary bg-transparent text-primary"

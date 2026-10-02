@@ -169,7 +169,12 @@ function extrasFrom(raw: unknown): ExtraField[] {
   return raw.map((e, i) => {
     const o = rec(e) || {};
     const body = str(o.body) || str(o.text) || str(o.title);
-    return { id: str(o.id, `ex_${i}`), body };
+    return {
+      id: str(o.id, `ex_${i}`),
+      body,
+      ...(o.applyImage === true ? { applyImage: true } : {}),
+      ...(o.emphasize === true ? { emphasize: true } : {}),
+    };
   });
 }
 

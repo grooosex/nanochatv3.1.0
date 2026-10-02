@@ -44,11 +44,34 @@ export function needsMarkupFormat(raw: string): boolean {
   return isShortBareCandidate(p.rest);
 }
 
-export function formatUserForChat(raw: string): string {
+export function standingDirectives(chat: {
+  extras?: { emphasize?: boolean; body?: string }[];
+  characters?: { extras?: { emphasize?: boolean; body?: string }[] }[];
+}): string[] {
+  const list = [...(chat.extras || []), ...(chat.characters || []).flatMap((c) => c.extras || [])];
+  return list.map((e) => (e.emphasize ? (e.body || "").trim() : "")).filter(Boolean);
+}
+
+function chatAuthorBlock(directives: string[]): string {
+  return `【作者指令】${directives.map((d) => `《${d}》`).join(" ")}\n角色听不见、不准念、不准写成「听到指示」。只执行与这轮文笔/剧情有关的；与画图、镜头、构图、tag 有关的忽略（生图会另处理）。`;
+}
+
+function imageAuthorBlock(directives: string[]): string {
+  return `作者指令：${directives.map((d) => `《${d}》`).join(" ")}（只执行与画面有关的；文笔/篇幅/怎么写的忽略）`;
+}
+
+export function formatUserForChat(raw: string, standing: string[] = []): string {
+  const extra = standing.map((s) => s.trim()).filter(Boolean);
   const t = (raw || "").trim();
+  if ((!t || t === OPENING_USER) && extra.length) {
+    const base = !t ? CONTINUE_USER : OPENING_USER;
+    return `${base}\n\n${chatAuthorBlock(extra)}`;
+  }
   if (!t) return CONTINUE_USER;
-  if (t === OPENING_USER || !needsMarkupFormat(t)) return raw;
-  const p = parseUserMarkup(t);
+  if (t === OPENING_USER) return raw;
+  const merged = extra.length ? `${t}${extra.map((d) => `《${d}》`).join("")}` : t;
+  if (!needsMarkupFormat(merged)) return raw;
+  const p = parseUserMarkup(merged);
   const parts: string[] = [];
   if (p.facts.length) {
     parts.push(
@@ -71,11 +94,14 @@ export function formatUserForChat(raw: string): string {
   return parts.join("\n\n");
 }
 
-export function formatUserForImage(raw: string): string {
+export function formatUserForImage(raw: string, standing: string[] = []): string {
+  const extra = standing.map((s) => s.trim()).filter(Boolean);
   const t = (raw || "").trim();
-  if (!t || t === OPENING_USER) return "";
-  const p = parseUserMarkup(t);
-  if (!needsMarkupFormat(t)) return `用户：${t}`;
+  if ((!t || t === OPENING_USER) && !extra.length) return "";
+  if (!t || t === OPENING_USER) return imageAuthorBlock(extra);
+  const merged = extra.length ? `${t}${extra.map((d) => `《${d}》`).join("")}` : t;
+  if (!needsMarkupFormat(merged)) return `用户：${t}`;
+  const p = parseUserMarkup(merged);
   const parts: string[] = [];
   if (p.facts.length) {
     parts.push(`用户已发生（镜头里必须是已经发生，不要写成准备、磨蹭或停在入口）：${p.facts.join("；")}`);
@@ -92,11 +118,20 @@ export function formatUserForImage(raw: string): string {
 export function recentSceneForImage(
   messages: { role: string; characterName?: string; content: string }[],
   n = 4,
+  standing: string[] = [],
 ): string {
-  return messages
-    .slice(-n)
-    .map((m) => {
-      if (m.role === "user") return formatUserForImage(m.content);
+  let lastUser = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === "user") {
+      lastUser = i;
+      break;
+    }
+  }
+  const slice = messages.slice(-n);
+  const offset = messages.length - slice.length;
+  return slice
+    .map((m, i) => {
+      if (m.role === "user") return formatUserForImage(m.content, offset + i === lastUser ? standing : []);
       if (m.role === "narrator") return m.content ? `旁白：${replyContextText(m.content)}` : "";
       return `${m.characterName || "角色"}：${replyContextText(m.content)}`;
     })
@@ -109,13 +144,14 @@ export function shotAndResidual(
   messages: { id: string; role: string; characterName?: string; content: string }[],
   msgId: string,
   shotOverride?: string,
+  standing: string[] = [],
 ): { shot: string; residual: string } {
   const idx = messages.findIndex((m) => m.id === msgId);
   const msg = idx >= 0 ? messages[idx] : undefined;
   const before = idx >= 0 ? messages.slice(0, idx) : messages;
   return {
     shot: (shotOverride ?? (msg ? replyStoryText(msg.content) : "")).trim(),
-    residual: recentSceneForImage(before, 4),
+    residual: recentSceneForImage(before, 4, standing),
   };
 }
 
@@ -123,12 +159,13 @@ export function shotAndResidual(
 export function latestUserBefore(
   messages: { id: string; role: string; content: string }[],
   msgId: string,
+  standing: string[] = [],
 ): string {
   const idx = messages.findIndex((m) => m.id === msgId);
   const before = idx >= 0 ? messages.slice(0, idx) : messages;
   for (let i = before.length - 1; i >= 0; i--) {
     if (before[i].role !== "user") continue;
-    const text = formatUserForImage(before[i].content).trim();
+    const text = formatUserForImage(before[i].content, standing).trim();
     if (text) return text;
   }
   return "";

@@ -1,12 +1,356 @@
 import { i as __toESM } from "../_runtime.mjs";
-import { t as __exportAll } from "./rolldown-runtime-D7D4PA-g.mjs";
-import { R as require_react, _ as createRootRoute, d as HeadContent, g as createFileRoute, h as lazyRouteComponent, m as Outlet, p as createRouter, u as Scripts, v as useRouter, y as require_jsx_runtime } from "../_libs/@tanstack/react-router+[...].mjs";
+import { _ as lazyRouteComponent, b as useRouter, f as Scripts, g as Outlet, h as createRouter, p as HeadContent, q as require_react, v as createFileRoute, x as require_jsx_runtime, y as createRootRoute } from "../_libs/@tanstack/react-router+[...].mjs";
 import { r as unzipSync } from "../_libs/fflate.mjs";
 import { i as TriangleAlert } from "../_libs/lucide-react.mjs";
 import { a as union, i as string, n as number, r as object, t as literal } from "../_libs/zod.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/router-B7589vDb.js
+//#region node_modules/.nitro/vite/services/ssr/assets/router-Wq2WyM9m.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
+var __defProp = Object.defineProperty;
+var __exportAll = (all, no_symbols) => {
+	let target = {};
+	for (var name in all) __defProp(target, name, {
+		get: all[name],
+		enumerable: true
+	});
+	if (!no_symbols) __defProp(target, Symbol.toStringTag, { value: "Module" });
+	return target;
+};
+var GROK_MODELS$1 = [
+	{
+		id: "grok-4.6-medium",
+		label: "4.6 均衡",
+		short: "4.6 均衡",
+		model: "grok-4.6",
+		effort: "medium"
+	},
+	{
+		id: "grok-4.6-high",
+		label: "4.6 专家",
+		short: "4.6 专家",
+		model: "grok-4.6",
+		effort: "high"
+	},
+	{
+		id: "grok-4.6-low",
+		label: "4.6 快速",
+		short: "4.6 快速",
+		model: "grok-4.6",
+		effort: "low"
+	},
+	{
+		id: "grok-4.5-medium",
+		label: "4.5 均衡",
+		short: "4.5 均衡",
+		model: "grok-4.5",
+		effort: "medium"
+	},
+	{
+		id: "grok-4.5-high",
+		label: "4.5 专家",
+		short: "4.5 专家",
+		model: "grok-4.5",
+		effort: "high"
+	},
+	{
+		id: "grok-4.5-low",
+		label: "4.5 快速",
+		short: "4.5 快速",
+		model: "grok-4.5",
+		effort: "low"
+	}
+];
+var DEFAULT_GROK = "grok-4.6-medium";
+function migrateGrokId(id) {
+	if (id && GROK_MODELS$1.some((m) => m.id === id)) return id;
+	if (id === "grok-4.6" || id === "grok-4-6") return "grok-4.6-medium";
+	if (id === "grok-4.5") return "grok-4.5-medium";
+	if (id === "grok-4.5-fast" || id === "grok-4.3" || id === "grok-4.3-low") return "grok-4.5-low";
+	if (id === "grok-4.6-fast") return "grok-4.6-low";
+	return DEFAULT_GROK;
+}
+var DEFAULT_LLM_PARAMS = {
+	temperature: .9,
+	topP: 1,
+	frequencyPenalty: 0,
+	presencePenalty: .4,
+	maxTokens: 4096,
+	contextTurns: 16
+};
+function mergeLlmParams(p) {
+	return {
+		...DEFAULT_LLM_PARAMS,
+		...p ?? {}
+	};
+}
+function shortModelLabel(id) {
+	if (!id) return "未选模型";
+	const i = id.lastIndexOf("/");
+	return i >= 0 ? id.slice(i + 1) : id;
+}
+var NAI_MODELS = [
+	{
+		id: "nai-diffusion-5-full",
+		label: "NAI V5 Full",
+		family: "v5"
+	},
+	{
+		id: "nai-diffusion-5-curated",
+		label: "NAI V5 Curated",
+		family: "v5"
+	},
+	{
+		id: "nai-diffusion-4-5-full",
+		label: "NAI V4.5 Full",
+		family: "v4.5"
+	},
+	{
+		id: "nai-diffusion-4-5-furry",
+		label: "NAI V4.5 Furry",
+		family: "v4.5",
+		wire: "nai-diffusion-4-5-full",
+		furry: true
+	},
+	{
+		id: "nai-diffusion-4-5-curated",
+		label: "NAI V4.5 Curated",
+		family: "v4.5"
+	},
+	{
+		id: "nai-diffusion-4-full",
+		label: "NAI V4 Full",
+		family: "v4"
+	},
+	{
+		id: "nai-diffusion-4-furry",
+		label: "NAI V4 Furry",
+		family: "v4",
+		wire: "nai-diffusion-4-full",
+		furry: true
+	},
+	{
+		id: "nai-diffusion-4-curated",
+		label: "NAI V4 Curated",
+		family: "v4",
+		wire: "nai-diffusion-4-curated-preview"
+	},
+	{
+		id: "nai-diffusion-3",
+		label: "NAI V3",
+		family: "v3"
+	},
+	{
+		id: "nai-diffusion-furry-3",
+		label: "NAI Furry V3",
+		family: "v3",
+		furry: true
+	}
+];
+var SAMPLERS = [
+	{
+		id: "k_euler_ancestral",
+		label: "Euler Ancestral"
+	},
+	{
+		id: "k_euler",
+		label: "Euler"
+	},
+	{
+		id: "k_dpmpp_2s_ancestral",
+		label: "DPM++ 2S Ancestral"
+	},
+	{
+		id: "k_dpmpp_2m",
+		label: "DPM++ 2M"
+	},
+	{
+		id: "k_dpmpp_sde",
+		label: "DPM++ SDE"
+	},
+	{
+		id: "k_dpmpp_2m_sde",
+		label: "DPM++ 2M SDE"
+	},
+	{
+		id: "ddim_v3",
+		label: "DDIM"
+	}
+];
+var NOISE_SCHEDULES = [
+	{
+		id: "karras",
+		label: "Karras"
+	},
+	{
+		id: "native",
+		label: "Native"
+	},
+	{
+		id: "exponential",
+		label: "Exponential"
+	},
+	{
+		id: "polyexponential",
+		label: "Polyexponential"
+	}
+];
+var RESOLUTIONS = [
+	{
+		label: "竖图 · 长",
+		group: "竖图",
+		w: 704,
+		h: 1472
+	},
+	{
+		label: "竖图 · 中",
+		group: "竖图",
+		w: 832,
+		h: 1216
+	},
+	{
+		label: "竖图 · 大",
+		group: "竖图",
+		w: 1024,
+		h: 1536
+	},
+	{
+		label: "横图 · 小",
+		group: "横图",
+		w: 768,
+		h: 512
+	},
+	{
+		label: "横图 · 中",
+		group: "横图",
+		w: 1216,
+		h: 832
+	},
+	{
+		label: "横图 · 大",
+		group: "横图",
+		w: 1536,
+		h: 1024
+	},
+	{
+		label: "方图 · 小",
+		group: "方图",
+		w: 640,
+		h: 640
+	},
+	{
+		label: "方图 · 中",
+		group: "方图",
+		w: 1024,
+		h: 1024
+	},
+	{
+		label: "方图 · 大",
+		group: "方图",
+		w: 1472,
+		h: 1472
+	}
+];
+var UC = {
+	heavy: "lowres, artistic error, film grain, scan, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, too many watermarks, negativeXL, negative, negative_hand-neg, extra digits, fewer digits, bad anatomy, bad hands",
+	light: "lowres, artistic error, scan, worst quality, bad quality, jpeg artifacts, very displeasing, logo, too many watermarks, negativeXL, negative, bad anatomy, bad hands",
+	human: "lowres, artistic error, scan, worst quality, bad quality, jpeg artifacts, very displeasing, overly naturalistic, logo, too many watermarks, negativeXL, negative, extra digits, bad anatomy"
+};
+var DEFAULT_NAI_BASE = "https://api.idlecloud.cc";
+var SENSITIVE_PREFIX = "rating: sensitive, nsfw, uncensored,";
+var UNCENSORED_TAG = "uncensored,";
+var FULLBODY_TAG = "1.5::full body,foot::,";
+var FURRY_TAG = "fur dataset,";
+var DEFAULT_STATUS_BAR = `状态栏:
+👤{name}
+🧣头发:
+👙里衣:
+🧦鞋袜:
+🔮身体改造:无
+🧪身体道具:无
+🍐肛门:粉嫩紧闭，从未被进入，微微收缩着
+🎟嘴巴:小巧粉唇微微张开
+🌸小穴:粉嫩紧致的处女穴
+🎀其他部位:
+💪🏻体力:精神充沛
+❤️健康状态:正常`;
+function joinPromptParts(...parts) {
+	return parts.map((s) => s.trim()).filter(Boolean).join(", ");
+}
+function defaultImageParams() {
+	return {
+		promptFront: "1.7::artist:mamezou::, 0.5::kawakami_rokkaku::, 0.8::artist:kojima_saya::, year 2024, year 2025, 0.5::satou kibi::, 0.3::quasarcake::",
+		promptMid: "",
+		promptBack: "rating:sensitive, nsfw, uncensored, masterpiece, highres, absurdres, newest, 4k, extremely detailed, 8k wallpaper, ultra-detailed, cinematic, anime",
+		merged: false,
+		sensitive: false,
+		uncensored: false,
+		fullBody: false,
+		tagSuggest: true,
+		negative: UC.heavy,
+		ucPreset: "heavy",
+		model: "nai-diffusion-4-5-full",
+		width: 832,
+		height: 1216,
+		sampler: "k_euler_ancestral",
+		noiseSchedule: "karras",
+		steps: 28,
+		scale: 5,
+		cfgRescale: 0,
+		seed: null,
+		seedLocked: false,
+		stepsLocked: false,
+		scaleLocked: false,
+		cfgRescaleLocked: false,
+		varietyPlus: false,
+		decrisper: false,
+		useCoords: false,
+		characters: []
+	};
+}
+function defaultPureParams() {
+	const p = defaultImageParams();
+	return {
+		...p,
+		merged: true,
+		promptMid: joinPromptParts(p.promptFront, p.promptMid, p.promptBack)
+	};
+}
+function normalizePureParams(p) {
+	if (p.merged && !p.promptMid.trim() && (p.promptFront.trim() || p.promptBack.trim())) return {
+		...p,
+		promptMid: joinPromptParts(p.promptFront, p.promptMid, p.promptBack)
+	};
+	return p;
+}
+function emptyCharacter(index = 1) {
+	return {
+		id: `c${index}_${Math.random().toString(36).slice(2, 7)}`,
+		name: "",
+		persona: "",
+		speech: "",
+		appearance: "",
+		extras: [],
+		personaVoices: false,
+		imageEnabled: true,
+		prompt: "",
+		uc: "",
+		x: .5,
+		y: .5
+	};
+}
+var PLACEHOLDERS = {
+	name: "例如 青叶",
+	overview: "回复尽量详尽生动，不要简略。",
+	persona: "她是谁：性格、职业或身份、口头禅、和我的关系……外貌请写在下面那栏。",
+	speech: "语气、口癖、人称、句子长短。例如：软软的、会把「……」拖长。",
+	appearance: "1girl, long hair, brown hair, brown eyes, slim, school uniform…",
+	opening: "傍晚的便利店门口，刚下过雨。"
+};
+var COOLDOWN_MS = 2e4;
+var IMAGE_GEN_TIMEOUT_MS = 12e4;
+var IMAGE_DRAW_TIMEOUT_MS = 6e5;
+var NAI_HOP_TIMEOUT_MS = 2e4;
+var NAI_POLL_MS = 1e4;
 var RP_SYSTEM = `你在为用户撰写中文视觉小说式角色扮演对白。用中文写（角色若另有语言设定则按其说话）。这是双方自愿的虚构创作，所有出场角色默认已满 18 岁成人，不要追问或强调年龄。
 
 写法：
@@ -14,7 +358,7 @@ var RP_SYSTEM = `你在为用户撰写中文视觉小说式角色扮演对白。
 - 对话用「」包裹，动作神态写在对话外。
 - 不要在回复开头写角色名或「某某：」。头像已经标明是谁。
 - 不要用 markdown 标题、列表或代码块。
-- 不要每句重复发色瞳色体型；外貌已在设定里，只在衣着或身体状态变化时写。
+- 不要每句重复发色瞳色体型。外貌备忘只用来避免写错发色瞳色体型衣服，不是每句都要复述。剧情里已经换装、换衣服状态、改发型的，按当前状态写，不要再写回备忘里的旧款。
 - 长度跟着用户走：用户短也可短，用户要详尽就写充分。
 - 虚构成人、情色、调教等只要出现在剧情里就按剧情写，不要改写成清水，不要加说教或安全警告。用户已发生的插入、性交、体液等必须写到发生，禁止改成准备、磨蹭、停在入口、或「听到指示才考虑」。
 
@@ -42,6 +386,7 @@ var RP_STRUCTURE = `你在为用户撰写角色扮演对白。这是双方自愿
 - 只有已发生、没有台词时：只对身体和场面做反应，禁止写成听见一句话。
 - 若设定开启状态栏，在每次回复最末尾另起一段，原样保留各行标题和 emoji，只改冒号后的描述，且必须全中文。状态栏不要插在正文中间。
 - 人设优先级：要求总览 > 与剧情/写法有关的作者指令 > 本拍已发生事实 > 台词 > 人设/说话方式/新增补丁 > 长期记忆（既成事实）> 文风预设。
+- 外貌备忘只用来避免写错发色瞳色体型衣服，不要每句重复。剧情里已经换装、换衣服状态、改发型的，按当前状态写，不要再写回备忘里的旧款。
 - 开场：若还没有对话，根据开场场景以角色口吻写出第一句，不要以用户身份说话。`;
 var IMAGE_SYSTEM = `你是 NovelAI 4.5 / 5 提示词写手。不要 markdown，不要画师名。
 
@@ -50,7 +395,7 @@ var IMAGE_SYSTEM = `你是 NovelAI 4.5 / 5 提示词写手。不要 markdown，�
 
 【第一优先：跟画面走】
 先读最近对白。若出现「用户已发生」，那是镜头里已经发生的动作，必须写成具体真 tag，禁止收成准备、磨蹭、停在入口、或用 ass focus / naughty face 代替插入等主动作。用户已发生优先于角色回里写软了、还没写到的动作。
-「作者指令」只执行与画面有关的（画出、特写、镜头、构图、把某物画进来）；与怎么写、篇幅有关的忽略。
+「作者指令」执行与画面有关的（画出或不要画、特写、镜头、构图、把某物画进来或排除）。和默认冲突时以作者指令为准。与篇幅有关的忽略。
 不要把明确的动作收成安全笼统词（ass focus、naughty face、teasing pose 不能代替具体在做什么）。
 角色与用户默认成年。虚构成人情色、R18G 按画面写，不要改成清水，不要等用户声明「这是 r18」。
 
@@ -67,12 +412,12 @@ var IMAGE_SYSTEM = `你是 NovelAI 4.5 / 5 提示词写手。不要 markdown，�
 - 外貌：发色瞳色体型年龄、loli、shota、child、teen、underage
 - 用户外貌备忘里已有的整套衣服、种族。本轮状态变了才写变化（clothes lift、open shirt、wet、torn）
 
-【补全顺序（主动作写完再补）】
+【补全顺序（用来查漏，不是每项都要填满）】
 1 构图：from behind, from above, from below, from side, cowboy shot, upper body, close-up, pov, ass focus, looking at viewer, looking back
 2 姿势：sitting, standing, lying, on back, on stomach, on couch, on bed, kneeling, squatting, all fours, bent over, leaning forward, arched back, spread legs, presenting
-3 服装状态：clothes lift, shirt lift, open shirt, panties aside, skirt lift, no panties, nude, torn clothes, wet clothes, see-through
-4 表情：blush, smile, open mouth, tongue out, half-closed eyes, embarrassed, naughty face, ahegao, tears, heavy breathing, steaming body, sweat
-5 场景：indoors, bedroom, living room, dim lighting, night, window, pillow, backlighting
+3 服装状态：只写变化（clothes lift, open shirt, panties aside, wet, torn）。不要把正面里已有的成衣名再写一遍
+4 表情：最多 2–3 组。翻白眼占其中一格，不另加
+5 场景：1–2 组。有地点了不要再堆室内、材质、封闭空间
 6 情色细节：见词库。对白里有的都写，不要用笼统词代替
 
 【词库（按需取，不是每张都用）】
@@ -86,7 +431,7 @@ var IMAGE_SYSTEM = `你是 NovelAI 4.5 / 5 提示词写手。不要 markdown，�
 guro：guro, gore, blood, decapitation, dismemberment, amputee, organs, intestines, dissection, killing, wounds, blood on body
 
 【成人加强开关】
-开：第一优先压过「不要硬塞」。对白里的动作/部位必须写成具体真 tag，写透、写够（大约 22–40 个）。宁可具体，不要保守。无关内容（喝茶却加插入）仍不要加。
+开：第一优先压过「不要硬塞」。对白里的动作/部位必须写成具体真 tag，不要收成 ass focus / naughty face。宁可具体，不要保守。无关内容（喝茶却加插入）仍不要加。
 关：对白里看得见的仍写，但不额外堆没写到的器官特写。完全没有性/血腥的场面不要加 nsfw。
 
 【「不要硬塞」优先级低】
@@ -96,15 +441,10 @@ guro：guro, gore, blood, decapitation, dismemberment, amputee, organs, intestin
 看用户消息末尾的格式要求：
 - 「只输出英文 tag 一行」：只输出一行逗号分隔 tag。禁止 JSON、禁止 markdown、禁止解释。
 - 「输出 JSON」：只输出一个 JSON 对象，不要围栏，不要解释。JSON 只是分拣单，不会被写进 NAI。
-  {"base":"人数、场景、镜头、光线、彼此位置关系","chars":{"角色中文名":"该角色本轮动作表情姿势服装状态"},"absent":["不在镜头的角色名"]}
-  chars 的键必须逐字用用户给的角色名，禁止 girl、char1、1girl、角色1。
-  该角色的互动写在她自己的值里：source#teasing, target#teasing, mutual#kiss。
-  不在镜头的只放 absent，不要出现在 chars。没人离开则 "absent":[]。
-  base 写人数 2girls / 1boy 1girl；chars 值里写 girl 或 boy，不要 1girl。
-  无脸男：faceless male。
-
-【多人原版】
-用户若要求原版：一行 tag，用 char1: ... char2: ... 区分，不要 JSON，不要 ENABLED。
+  {"base":"场景、镜头、光线","chars":{"在场者名单上的中文名":"该人这一镜的动作表情姿势"},"absent":["不在场的角色名"]}
+  chars 只写这一镜真正在场的人。键必须逐字用名单上的中文名，禁止 girl、char1、1girl、角色1。
+  不在场的（只是被口头提起也算不在场）只放 absent，不要出现在 chars。名单上的人不是每个人都要写。
+  chars 值里写 girl 或 boy，不要 1girl。
 
 【反例 → 正例】（说明怎么跟画面走，不是固定配方）
 错：shirt_collar_crooked, sitting_on_sofa, teasing_pose
@@ -130,6 +470,59 @@ var IMAGE_BG_RULES = `【背景】
 对白完全看不出人在哪，才用下面的「上一镜地点」；没有就不要写地点，不要编。
 地点写在你输出的最前面（多人写在 base 最前）。
 不要从长期记忆抄地点。`;
+var IMAGE_MULTI_RULES = `【多人互动——必须遵守】
+一张图 = 总提示 base + 每个在场角色一条 chars。不要用 | 分隔。不要输出 ENABLED，不要输出坐标。
+
+【谁在场——只决定哪些角色写进这张图，不改本镜、残留、衣服、背景】
+只看这一轮：用户刚发的这一句，加上这轮正文。不要用更早的对白、残留或长期记忆决定谁在场。
+人在画面里才算在场。正在做事的算；用外号或「她/他」指到、但人就在画面里的也算。
+这轮没出现，或者只是被口头提起、人不在画面里：不算在场。
+在场的写入 chars。不在场的放进 absent，不要写 tag，不要占一条 chars。名单上的人不是每个人都要写。
+
+总提示（base）：场景、构图、光、道具、群体氛围。地点写最前。人数按画面里真正画出来的人写：一个女孩写 1girl，两个女孩写 2girls，一个女孩一个男孩写 1girl, 1boy，两个女孩一个男孩写 2girls, 1boy，以此类推。禁止有 3people 这种写法。写进角色提示词的人必须算进去。不要因为用户在场、在说话，就多画一个人。画面里没有他的身体，就不要写他。有他的身体，写在总提示里，加 1boy，不要写到别的角色身上。不要写 source# / target# / mutual#。群体动作词（yuri, ffm threesome, sex from behind）可以留在 base，谁对谁仍拆到在场的人。
+
+各角色（chars）：只写在场的人，接到该角色自己的正面提示词后面。键必须逐字用角色名单里的中文名；正文用了外号，键仍用名单上的名字。以 girl 或 boy 起头（不要 1girl）。只写这一人此刻的姿势、表情、视角、服装即时状态、动作。不要写发色瞳色发型体型种族。禁止用 girl、char1、1girl、角色1 当键。
+
+互动前缀只写在对应角色的 chars 里，不要写在 base。同一动作、同一词根，两边成对：
+- 施动 source#kiss / source#hug / source#grabbing / source#holding hands / source#pointing at another / source#sex / source#fellatio / source#paizuri
+- 接收 target#kiss / target#hug / target#grabbing / target#holding hands / target#pointing / target#sex / target#fellatio / target#paizuri
+- 互相两边都 mutual#kiss / mutual#hug / mutual#looking at each other / mutual#holding hands
+谁伸手、谁被抱、谁在上面，一定拆到对应人。没有互动就不要硬加这些前缀。不在场的人不要写。
+
+两人都在场：
+{"base":"2girls, bedroom, from side","chars":{"角色甲":"girl, source#kiss, sitting, blush, open mouth","角色乙":"girl, target#kiss, standing, half-closed eyes"},"absent":[]}
+
+原版一行只给在场的人写 char1 / char2，不在场的整段省略。
+官方指人：施动 source#pointing at another，被指 target#pointing。`;
+function multiInsertInstruction(characters, kind) {
+	const roster = characters.map((c, i) => `${i + 1}. ${c.name.trim() || `角色${i + 1}`}`).join("\n");
+	return `${kind === "chat" ? "<<<PROMPT>>> 里只输出 JSON（不要 markdown）" : "输出 JSON（不要 markdown）"}：{"base":"这一镜真正画出来的人数、场景、镜头、光线","chars":{"在场者名单上的中文名":"该人动作表情姿势"},"absent":["不在场的角色名"]}
+角色名单：
+${roster}
+chars 只写这一镜在场的人，键逐字用名单上的中文名。不在场的放进 absent，不要给键。不必每个人都写。`;
+}
+function isV5Model(model) {
+	return model === "nai-diffusion-5-full" || model === "nai-diffusion-5-curated";
+}
+function imageTagBudget(model) {
+	return isV5Model(model) ? 110 : 45;
+}
+function imageWriteMaxTokens(model) {
+	return isV5Model(model) ? 700 : 500;
+}
+function imageLengthRules(model, adultBoost) {
+	const n = imageTagBudget(model);
+	const adult = isV5Model(model) ? `成人提示词加强开着：可以写 40–110 组。够用就停，禁止为凑满上限再堆，也不要压成十几组。` : `成人提示词加强开着：可以写 25–45 组。够用就停，禁止为凑满上限再堆，也不要压成十几组。`;
+	return `【篇幅——必须遵守】
+组 = 逗号隔开的一段。from behind 是 1 组，不是两个词。
+这一轮新加的 tag 合计必须不超过 ${n} 组（多人则 base 与各人 chars 加起来必须不超过 ${n}）。超过就是错。
+日常大约 12–25 组。${adultBoost ? `\n${adult}` : ""}
+表情必须 2–3 组：哭留一个，脸红留一个，嘴或眼留镜头上最显眼的一个。翻白眼替换其中之一，不另加。不要连写近义情绪词。不要写看不见的情绪抽象词。对白里的现场脏污、残留可以写。
+衣服只写变化，不要把用户正面提示词里已有的成衣名再写一遍。同一变化只写一次。
+场景 1–2 组。有地点了不要再堆室内、材质、封闭空间。
+对白里的动作和状态都可以写。同一意思不要连写近义。词库按需取，禁止把一整类抄进输出。
+补全顺序用来查漏，不要为填满清单再堆。`;
+}
 function splitChatPrompt(full) {
 	const start = full.search(/<<<PROMPT>>>/i);
 	if (start < 0) return {
@@ -154,20 +547,31 @@ function splitChatPrompt(full) {
 		ended: true
 	};
 }
+function imageApplyRules(chat) {
+	const bits = chat.extras.filter((e) => e.applyImage && e.body.trim()).map((e) => e.body.trim());
+	if (!bits.length) return "";
+	return `【生图规则·作者指令·压过前面的默认】
+下面是用户给写 tag 的规则，只约束怎么写，禁止把这段原文抄进 tag。
+和前面的默认冲突时，以这里为准。
+${bits.join("\n\n")}`;
+}
 function chatImageSystem(chat, prevScene = "") {
-	const format = chat.isMulti && chat.promptMode === "insert" ? `<<<PROMPT>>> 里只输出 JSON（不要 markdown）：{"base":"人数场景镜头光线","chars":{${chat.characters.map((c) => `"${c.name || c.id}":"..."`).join(",")}},"absent":[]}
-chars 的键必须逐字用角色中文名。不在镜头的放进 absent。没人离开则 absent 为 []。` : chat.isMulti ? `<<<PROMPT>>> 里只输出英文 tag 一行，用 char1: ... char2: ... 区分。禁止 JSON，禁止 ENABLED。` : `<<<PROMPT>>> 里只输出英文 tag 一行。禁止 JSON。`;
-	const adult = chat.adultBoost ? `【成人提示词加强】开。对白里的动作、部位、体液必须写成具体真 tag，写透（大约 22–40 个），不要收成 ass focus / naughty face。无关内容仍不要加。` : `【成人提示词加强】关。对白里看得见的仍写具体真 tag，不额外堆没写到的器官特写。完全没有性/血腥的场面不要加 nsfw。`;
+	const format = chat.isMulti && chat.promptMode === "insert" ? multiInsertInstruction(chat.characters, "chat") : chat.isMulti ? `<<<PROMPT>>> 里只输出英文 tag 一行，地点写最前。只给在场的人写 char1: ... char2: ...，不在场的整段省略。禁止 JSON，禁止 ENABLED。` : `<<<PROMPT>>> 里只输出英文 tag 一行。禁止 JSON。`;
+	const adult = chat.adultBoost ? `【成人提示词加强】开。对白里的动作、部位、体液必须写成具体真 tag，不要收成 ass focus / naughty face。无关内容仍不要加。` : `【成人提示词加强】关。对白里看得见的仍写具体真 tag，不额外堆没写到的器官特写。完全没有性/血腥的场面不要加 nsfw。`;
 	return `${IMAGE_SYSTEM}
 
 ${IMAGE_SHOT_RULES}
 
 ${IMAGE_BG_RULES}
 
-上一镜地点（对白看不出人在哪时才用，只借人所在的地方）：
+${chat.isMulti ? `${IMAGE_MULTI_RULES}\n\n` : ""}上一镜地点（对白看不出人在哪时才用，只借人所在的地方）：
 ${prevScene.trim() || "（无）"}
 
 ${adult}
+
+${imageLengthRules(chat.imageParams.model, chat.adultBoost)}
+
+${imageApplyRules(chat)}
 
 【输出顺序——必须遵守，覆盖「只输出标签」】
 1. 先写完整角色扮演正文（若开启状态栏，放在正文最后）。正文里禁止出现 tag、禁止出现 <<<PROMPT>>>。
@@ -227,14 +631,44 @@ var FIELD_SYSTEM = `你只改用户指定的那一个栏。其它栏是只读上
 - 外貌备忘：只输出英文 NAI tag（发型发色瞳色体型固定服装）。有旧 tag 时以旧 tag 为种子改，不要改成中文。
 - 开场场景：地点、动作、气氛。大约 80–160 字。
 - 名字：一个中文名，不要解释。`;
+var PERSONA_VOICE_RULES = `【人设·声部写法——覆盖普通人设字数】
+这栏要写成「短骨架 + 五声部语料」，不是形容词列表。目标大约 1200–2500 字。外貌不写。不要把说话方式栏整段抄进来。声部标题是正文的一部分，必须写。
+
+【骨架】先用几行立住：身份/底线、日常和压力下的反差、和「我」的关系、喜恶。具体可演，不要标签堆砌。没写关系时给不抢戏的默认，不擅自升级成恋人。
+
+【五声部】骨架之后按这个顺序写。语料是主体：每个场景小标题下两句带引号的原话；需要时才加一句括号动作。
+声部一·社会：对外。搭话、遇事、闲聊等，场景从这份人设的生活里长出来。
+声部二·内心：独处、受挫、触雷时她怎么想、怎么嘀咕。
+声部三·（自拟标题）：这个人最能被认出来的那一档。标题按她来（审美、中二、战斗、撒娇……）。禁止套用与本卡无关的审美辩论或中二破功。
+声部四·他者：两个有名字或身份的人在说她。夸里带一点不完美，不要全是路人吹捧。
+声部五·作者：第三人称点题，反差从哪来、演的时候别演歪。散文，不要对白。
+
+每块 2–3 个场景。场景名必须从这个人的生活里长出来。
+
+排版（只学格式，内容必须换成这个人）：
+声部一·社会
+向邻居借东西
+“一句符合她口吻的话。”
+“另一句。”`;
+function voicePolishExtra(chat) {
+	const marked = chat.characters.map((c, i) => {
+		if (!c.personaVoices) return "";
+		if (!chat.isMulti) return "本卡唯一角色";
+		return `角色${i + 1}${c.name.trim() ? `「${c.name.trim()}」` : ""}`;
+	}).filter(Boolean);
+	if (!marked.length) return "";
+	return `${PERSONA_VOICE_RULES}
+
+以上声部写法只用于这些人的 persona：${marked.join("、")}。其他人的 persona 仍按 180–400 字普通人设写。说话方式、总览、开场、外貌一律不要写成声部。`;
+}
 var MEMORY_SYSTEM = `把更早的角色扮演对白压成一份「剧情备忘」。中文，第三人称，像给后任主持人看的场记。信息密度高，控制在 900–1400 字。
 保留：人名与称呼、关系变化、约定/承诺、关键事件时间线、地点、随身/现场道具、身体与衣物状态（含成人细节）、未完成的事、新暴露的性格或秘密。
 已经发生的性行为和重要身体接触必须记作经历和事实（例如曾经肛交过），不要因为动作结束就抹掉。不要把已结束的动作写成「正在做」（现在在客厅说话，就不要写成正趴着后入）。
 丢掉：被后来剧情明确推翻的旧事实、纯气氛修辞、重复对白。
 不要写文笔赏析。不要发明没发生的事。不要对话体复读。不要建议下一句。不要提到「这是记忆」。
-若已有上一份备忘，以它为底把新这一截叠上去；冲突以新这一截为准，仍有效的旧事实不要丢。
+若已有上一份备忘，以它为底把新这一截叠上去；冲突以新这一截为准，仍有效的旧事实不要丢。注意这不是补篇、补记或续写，是把上一份备忘和这一截新对白结合成一份完整的剧情备忘(涵盖从第一轮开始的内容)。
 只返回备忘正文。`;
-var PROMPT_REWRITE_SYSTEM = `根据对话和上一份提示词，重写一份 NAI 4.5/5 英文 tag。规则同生图写手：先把对白里的主动作写成具体真 tag，空格不分下划线，不写画风画师质量词外貌。成人加强开时写透，不要收成安全词。完全无关的情色不要硬塞。只输出 tag 行，不要解释。`;
+var PROMPT_REWRITE_SYSTEM = `根据对话和上一份提示词，重写一份 NAI 4.5/5 英文 tag。规则同生图写手：先把对白里的主动作写成具体真 tag，空格不分下划线，不写画风画师质量词外貌。成人加强开时写成具体真 tag，不要收成安全词。完全无关的情色不要硬塞。只输出 tag 行，不要解释。`;
 function systemFor(task, extra, styleExtra, imageSystem) {
 	const style = styleExtra?.trim() || "";
 	if (task === "chat") {
@@ -245,7 +679,10 @@ function systemFor(task, extra, styleExtra, imageSystem) {
 		return img ? `${withStyle}\n\n${img}` : withStyle;
 	}
 	if (task === "image") return extra ? `${IMAGE_SYSTEM}\n\n${extra}` : IMAGE_SYSTEM;
-	if (task === "polish") return style ? `${POLISH_SYSTEM}\n\n${style}` : POLISH_SYSTEM;
+	if (task === "polish") {
+		const core = extra ? `${POLISH_SYSTEM}\n\n${extra}` : POLISH_SYSTEM;
+		return style ? `${core}\n\n${style}` : core;
+	}
 	if (task === "field") {
 		const core = extra ? `${FIELD_SYSTEM}\n\n${extra}` : FIELD_SYSTEM;
 		return style ? `${core}\n\n${style}` : core;
@@ -305,12 +742,13 @@ function fieldPolishHint(opts) {
 		opts.charLabel ? `只改${opts.charLabel}的「${label}」这一栏。` : `只改整卡字段「${label}」。`,
 		opts.current.trim() ? `本栏现有文字（种子；刷新时扩写，个性化时当材料，不要原样丢回短句）：\n${opts.current.trim()}` : `本栏目前是空的，根据其它栏生成完整可用的「${label}」。`,
 		opts.instruction?.trim() ? `用户对本栏的要求（最高优先，可以覆盖本栏旧字）：\n${opts.instruction.trim()}` : `这是刷新：依据本栏现有（若有）和其它栏，重写到可用浓度。`,
-		"只输出该栏正文。不要标题、不要解释、不要 JSON、不要其它栏。外貌栏只输出英文 NAI tag。"
-	].join("\n\n");
+		opts.voices && opts.field === "persona" ? `${PERSONA_VOICE_RULES}\n\n本栏覆盖上面的普通人设字数。只输出人设正文（骨架+五声部），不要 JSON，不要其它栏。` : "",
+		"只输出该栏正文。不要解释、不要 JSON、不要其它栏。外貌栏只输出英文 NAI tag。声部标题若按声部写，算正文。"
+	].filter(Boolean).join("\n\n");
 }
 function chatContextBlock(chat, opts) {
 	const chars = chat.characters.map((c, i) => characterBlock(c, chat.isMulti ? i + 1 : 0)).join("\n\n");
-	const extras = [...chat.extras, ...chat.characters.flatMap((c) => c.extras)].map((e, i) => `新增${i + 1}：${e.body}`).filter((s) => s.length > 4).join("\n");
+	const extras = [...chat.extras, ...chat.characters.flatMap((c) => c.extras)].filter((e) => !e.emphasize).map((e, i) => `新增${i + 1}：${e.body}`).filter((s) => s.length > 4).join("\n");
 	const bar = statusBarFor(chat);
 	const barText = opts?.regen ? statusBarSkeleton(bar) : bar;
 	return [
@@ -320,7 +758,7 @@ function chatContextBlock(chat, opts) {
 		extras ? `【补丁】\n${extras}` : "",
 		chat.memory ? `【长期记忆·既成事实】\n${chat.memory}` : "",
 		chat.statusBarOn ? `【状态栏开启】每轮末尾输出，模板：\n${barText}` : "【状态栏关闭】",
-		opts?.regen ? "【重写】这是同一拍另写一条路。禁止套用上一稿的句子、段落结构和状态栏描述。" : "",
+		opts?.regen ? "【重写】这一拍当作第一次写。只根据人设、开场、记忆和到上一句为止的对话往下演。" : "",
 		chat.isMulti ? `【多人】模式=${chat.multiMode === "group" ? "群聊（角色分头像各说，最后旁白）" : "同聊（一条里写所有在场角色）"}` : ""
 	].filter(Boolean).join("\n\n");
 }
@@ -329,7 +767,7 @@ function characterBlock(c, idx) {
 		idx ? `【角色${idx}：${c.name || "未命名"}】` : `【角色：${c.name || "未命名"}】`,
 		c.persona && `人设：${c.persona}`,
 		c.speech && `说话方式：${c.speech}`,
-		c.appearance && `外貌备忘（生图用，正文不要重复）：${c.appearance}`
+		c.appearance && `外貌备忘（给正文校对用，不是生图底）：${c.appearance}`
 	].filter(Boolean).join("\n");
 }
 function groupFormatHint(chat, withImage = false) {
@@ -634,7 +1072,7 @@ function PreviewHostBridge() {
 	}, [router]);
 	return null;
 }
-var styles_default = "/assets/styles-CO0rNlRp.css";
+var styles_default = "/assets/styles-Ba9KnWa5.css";
 var APP_NAME = "绘语";
 var Route$4 = createRootRoute({
 	head: () => ({
@@ -684,7 +1122,7 @@ var Route$4 = createRootRoute({
 		] })]
 	})
 });
-var $$splitComponentImporter = () => import("./routes-h7rF3gxm.mjs").then((n) => n.f);
+var $$splitComponentImporter = () => import("./routes-DGEvAUKS.mjs").then((n) => n.p);
 var Route$3 = createFileRoute("/")({ component: lazyRouteComponent($$splitComponentImporter, "component") });
 var GROK_MODELS = {
 	"grok-4.6-high": {
@@ -840,7 +1278,8 @@ var Route$2 = createFileRoute("/api/grok")({ server: { handlers: { POST: async (
 		ok: false,
 		error: result.error
 	}, { status: 500 });
-	let text = (await result.res.json()).choices?.[0]?.message?.content ?? "";
+	const msg = (await result.res.json()).choices?.[0]?.message;
+	let text = (msg?.content || msg?.reasoning_content || msg?.reasoning || "").trim();
 	text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
 	return Response.json({
 		ok: true,
@@ -848,7 +1287,7 @@ var Route$2 = createFileRoute("/api/grok")({ server: { handlers: { POST: async (
 	});
 } } } });
 var SKIP_MODEL = /embedding|embed|whisper|tts|rerank|kolors|flux|stable-diffusion|sdxl|sd-3|sd3|image|video|audio|moderation|bge-|jina-|clip|vae|unet|speech|asr|kokoro|fish-speech|sensevoice|hunyuanvideo|cogvideox|wanx|caption/i;
-function normalizeBase(raw) {
+function normalizeBase$1(raw) {
 	let u = (raw || "").trim();
 	if (!u) return "";
 	if (!/^https?:\/\//i.test(u)) u = `https://${u}`;
@@ -918,7 +1357,7 @@ function sseResponse(upstream) {
 }
 var Route$1 = createFileRoute("/api/llm")({ server: { handlers: { POST: async ({ request }) => {
 	const body = await request.json();
-	const base = normalizeBase(body.baseUrl || "");
+	const base = normalizeBase$1(body.baseUrl || "");
 	const key = (body.apiKey || "").trim();
 	if (!base) return Response.json({
 		ok: false,
@@ -999,7 +1438,8 @@ var Route$1 = createFileRoute("/api/llm")({ server: { handlers: { POST: async ({
 			}, { status: 500 });
 		}
 		if (body.stream) return sseResponse(r);
-		let text = (await r.json()).choices?.[0]?.message?.content ?? "";
+		const msg = (await r.json()).choices?.[0]?.message;
+		let text = (msg?.content || msg?.reasoning_content || msg?.reasoning || "").trim();
 		text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
 		return Response.json({
 			ok: true,
@@ -1012,9 +1452,79 @@ var Route$1 = createFileRoute("/api/llm")({ server: { handlers: { POST: async ({
 		}, { status: 500 });
 	}
 } } } });
+function normalizeBase(url) {
+	return (url || "https://api.idlecloud.cc").replace(/\/+$/, "");
+}
+function absUrl(base, url) {
+	if (/^https?:\/\//i.test(url)) return url;
+	return normalizeBase(base) + (url.startsWith("/") ? url : `/${url}`);
+}
+function looksHtml(text) {
+	const t = text.trimStart().slice(0, 80).toLowerCase();
+	return t.startsWith("<!doctype") || t.startsWith("<html") || t.startsWith("<?xml") || t.includes("<title>internal server error");
+}
+function mapIdlecloudError(status, body) {
+	if (looksHtml(body)) return "中转站返回了异常页面";
+	let code = "";
+	let msg = "";
+	try {
+		const j = JSON.parse(body);
+		code = String(j.error || "");
+		msg = String(j.message || j.detail || "");
+	} catch {
+		if (body) msg = body.slice(0, 180);
+	}
+	if (code === "NOVELAI_V5_WEEKLY_QUOTA_EXCEEDED") return "NovelAI V5 本周额度已用完，请改用 V4.5 或等重置";
+	if (code === "NOVELAI_V5_BACKEND_QUOTA_EXHAUSTED") return "V5 后端额度暂时耗尽，请稍后或改用 V4.5";
+	if (status === 401 || status === 403) return "API Key 无效或档位不够，请重新填写";
+	if (status === 402) return "中转站积分不足";
+	if (status === 409) return "已有一张图正在生成，请等它完成后再试";
+	if (status === 429 || code === "RATE_LIMITED") return msg || "中转站限制 20 秒内只能提交一次生图（聊天配图和纯生图共用），请稍后再试";
+	if (status === 504) return "中转站超时，请稍后重试";
+	return msg || code || `中转站 ${status}`;
+}
+function authHeaders(key) {
+	return {
+		Authorization: `Bearer ${key}`,
+		Accept: "application/json, application/zip, image/png, */*"
+	};
+}
+function parseJob(text) {
+	if (!text || looksHtml(text)) return null;
+	try {
+		const j = JSON.parse(text);
+		if (j?.data && typeof j.data === "object" && !j.job_id && !j.image && !j.image_url) return {
+			...j,
+			...j.data
+		};
+		return j;
+	} catch {
+		return null;
+	}
+}
+function toB64(png) {
+	let binary = "";
+	const chunk = 32768;
+	for (let i = 0; i < png.length; i += chunk) binary += String.fromCharCode(...png.subarray(i, i + chunk));
+	return btoa(binary);
+}
+function extractPng(u8) {
+	if (u8[0] === 137 && u8[1] === 80) return u8;
+	try {
+		const files = unzipSync(u8);
+		const name = Object.keys(files).find((n) => n.toLowerCase().endsWith(".png"));
+		return name ? files[name] : Object.values(files)[0] ?? null;
+	} catch {
+		return null;
+	}
+}
+function imageField(image) {
+	if (!image || image.length < 80) return "";
+	return image.includes("base64,") ? image.split("base64,").pop() || "" : image;
+}
 var Route = createFileRoute("/api/nai")({ server: { handlers: { POST: async ({ request }) => {
 	const body = await request.json();
-	const base = (body.baseUrl || "https://api.idlecloud.cc").replace(/\/$/, "");
+	const base = normalizeBase(body.baseUrl || "https://api.idlecloud.cc");
 	const key = (body.apiKey || "").trim();
 	if (!key) return Response.json({
 		ok: false,
@@ -1025,12 +1535,12 @@ var Route = createFileRoute("/api/nai")({ server: { handlers: { POST: async ({ r
 		const text = await r.text();
 		if (r.status === 401 || r.status === 403) return Response.json({
 			ok: false,
-			error: text.slice(0, 300) || `鉴权失败 ${r.status}`
+			error: mapIdlecloudError(r.status, text)
 		});
 		if (r.ok || r.status === 404) return Response.json({ ok: true });
 		return Response.json({
 			ok: r.status < 500,
-			error: text.slice(0, 400) || `HTTP ${r.status}`
+			error: mapIdlecloudError(r.status, text)
 		});
 	} catch (e) {
 		return Response.json({
@@ -1038,50 +1548,160 @@ var Route = createFileRoute("/api/nai")({ server: { handlers: { POST: async ({ r
 			error: e instanceof Error ? e.message : "无法连接中转站"
 		});
 	}
+	const hop = AbortSignal.timeout(NAI_HOP_TIMEOUT_MS);
 	try {
-		const r = await fetch(`${base}/api/ai/generate-image`, {
-			method: "POST",
-			headers: {
-				Authorization: `Bearer ${key}`,
-				"Content-Type": "application/json"
-			},
-			body: JSON.stringify(body.payload ?? {})
-		});
-		if (!r.ok) {
-			const t = await r.text().catch(() => "");
-			return Response.json({
+		if (body.action === "fetch") {
+			if (!body.fileUrl) return Response.json({
 				ok: false,
-				error: t.slice(0, 800) || `中转站 ${r.status}`,
-				status: r.status
+				error: "缺少图片地址"
+			});
+			const r = await fetch(absUrl(base, body.fileUrl), {
+				headers: authHeaders(key),
+				signal: hop
+			});
+			const u8 = new Uint8Array(await r.arrayBuffer());
+			if (!r.ok) return Response.json({
+				ok: false,
+				error: mapIdlecloudError(r.status, new TextDecoder().decode(u8))
+			});
+			const png = extractPng(u8);
+			if (!png) return Response.json({
+				ok: false,
+				error: "中转站没有返回图片"
+			});
+			const v5 = body.v5;
+			if (v5?.confirmation_required && v5.confirm_url) try {
+				await fetch(absUrl(base, v5.confirm_url), {
+					method: "POST",
+					headers: {
+						...authHeaders(key),
+						"Content-Type": "application/json"
+					},
+					body: JSON.stringify({
+						sha256: v5.sha256,
+						size_bytes: v5.size_bytes
+					})
+				});
+			} catch {}
+			return Response.json({
+				ok: true,
+				image: toB64(png)
 			});
 		}
-		const ab = await r.arrayBuffer();
-		const u8 = new Uint8Array(ab);
-		let png = null;
-		if (u8[0] === 137 && u8[1] === 80) png = u8;
-		else try {
-			const files = unzipSync(u8);
-			const name = Object.keys(files).find((n) => n.toLowerCase().endsWith(".png"));
-			png = name ? files[name] : Object.values(files)[0] ?? null;
-		} catch {
-			png = u8;
+		if (body.action === "poll") {
+			if (!body.jobId && !body.statusUrl) return Response.json({
+				ok: false,
+				error: "缺少任务编号"
+			});
+			const url = body.statusUrl ? absUrl(base, body.statusUrl) : `${base}/api/get_result/${body.jobId}`;
+			const r = await fetch(url, {
+				headers: authHeaders(key),
+				signal: hop
+			});
+			const text = await r.text();
+			if (!r.ok) return Response.json({
+				ok: false,
+				error: mapIdlecloudError(r.status, text)
+			});
+			if (looksHtml(text)) return Response.json({
+				ok: false,
+				error: "中转站返回了异常页面"
+			});
+			const j = parseJob(text);
+			if (!j) return Response.json({
+				ok: true,
+				pending: true
+			});
+			if (j.status === "failed" || j.error && j.status !== "completed" && !j.image_url && !j.image && !j.v5_delivery?.file_url) return Response.json({
+				ok: false,
+				error: j.error || j.message || "生成失败"
+			});
+			const inline = imageField(j.image);
+			if (inline) return Response.json({
+				ok: true,
+				image: inline
+			});
+			const fileUrl = j.v5_delivery?.file_url || j.image_url;
+			if (j.status === "completed" || fileUrl) {
+				if (!fileUrl) return Response.json({
+					ok: true,
+					pending: true,
+					statusUrl: j.v5_delivery?.status_url
+				});
+				return Response.json({
+					ok: true,
+					fileUrl,
+					statusUrl: j.v5_delivery?.status_url,
+					v5: j.v5_delivery
+				});
+			}
+			return Response.json({
+				ok: true,
+				pending: true,
+				statusUrl: j.v5_delivery?.status_url
+			});
 		}
-		if (!png) return Response.json({
-			ok: false,
-			error: "中转站没有返回图片"
+		const r = await fetch(`${base}/api/generate_image`, {
+			method: "POST",
+			headers: {
+				...authHeaders(key),
+				"Content-Type": "application/json"
+			},
+			body: JSON.stringify(body.payload ?? {}),
+			signal: hop
 		});
-		let binary = "";
-		const chunk = 32768;
-		for (let i = 0; i < png.length; i += chunk) binary += String.fromCharCode(...png.subarray(i, i + chunk));
-		const b64 = btoa(binary);
+		const u8 = new Uint8Array(await r.arrayBuffer());
+		const text = new TextDecoder().decode(u8);
+		if (!r.ok) return Response.json({
+			ok: false,
+			error: mapIdlecloudError(r.status, text)
+		});
+		const png = extractPng(u8);
+		if (png && (u8[0] === 137 || u8[0] === 80)) return Response.json({
+			ok: true,
+			image: toB64(png)
+		});
+		if (looksHtml(text)) return Response.json({
+			ok: false,
+			error: "中转站返回了异常页面"
+		});
+		const j = parseJob(text);
+		if (!j) return Response.json({
+			ok: false,
+			error: "中转站返回无法解析"
+		});
+		const inline = imageField(j.image);
+		if (inline) return Response.json({
+			ok: true,
+			image: inline
+		});
+		if (j.error && !j.job_id && !j.id) return Response.json({
+			ok: false,
+			error: j.error
+		});
+		const fileUrl = j.v5_delivery?.file_url || j.image_url;
+		const jobId = j.job_id || j.id;
+		if (fileUrl && !jobId) return Response.json({
+			ok: true,
+			fileUrl,
+			v5: j.v5_delivery
+		});
+		if (!jobId && !j.v5_delivery?.status_url) return Response.json({
+			ok: false,
+			error: "中转站没有返回任务"
+		});
 		return Response.json({
 			ok: true,
-			image: b64
+			jobId,
+			statusUrl: j.v5_delivery?.status_url,
+			fileUrl,
+			v5: j.v5_delivery
 		});
 	} catch (e) {
+		const abort = (e instanceof DOMException || e instanceof Error) && (e.name === "AbortError" || e.name === "TimeoutError");
 		return Response.json({
 			ok: false,
-			error: e instanceof Error ? e.message : "生图请求失败"
+			error: abort ? "中转站超时，请稍后重试" : e instanceof Error ? e.message : "生图请求失败"
 		});
 	}
 } } } });
@@ -1116,4 +1736,4 @@ function getRouter() {
 	});
 }
 //#endregion
-export { chatContextBlock as a, groupFormatHint as c, IMAGE_SHOT_RULES as i, roleSnapshot as l, FIELD_LABELS as n, chatImageSystem as o, IMAGE_BG_RULES as r, fieldPolishHint as s, router_exports as t, splitChatPrompt as u };
+export { NOISE_SCHEDULES as A, joinPromptParts as B, FURRY_TAG as C, NAI_HOP_TIMEOUT_MS as D, IMAGE_GEN_TIMEOUT_MS as E, UC as F, __exportAll as G, migrateGrokId as H, UNCENSORED_TAG as I, defaultImageParams as L, RESOLUTIONS as M, SAMPLERS as N, NAI_MODELS as O, SENSITIVE_PREFIX as P, defaultPureParams as R, FULLBODY_TAG as S, IMAGE_DRAW_TIMEOUT_MS as T, normalizePureParams as U, mergeLlmParams as V, shortModelLabel as W, COOLDOWN_MS as _, IMAGE_SHOT_RULES as a, DEFAULT_NAI_BASE as b, fieldPolishHint as c, imageLengthRules as d, imageWriteMaxTokens as f, voicePolishExtra as g, splitChatPrompt as h, IMAGE_MULTI_RULES as i, PLACEHOLDERS as j, NAI_POLL_MS as k, groupFormatHint as l, roleSnapshot as m, FIELD_LABELS as n, chatContextBlock as o, multiInsertInstruction as p, IMAGE_BG_RULES as r, chatImageSystem as s, router_exports as t, imageApplyRules as u, DEFAULT_GROK as v, GROK_MODELS$1 as w, DEFAULT_STATUS_BAR as x, DEFAULT_LLM_PARAMS as y, emptyCharacter as z };

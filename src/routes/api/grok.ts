@@ -25,7 +25,6 @@ async function callXai(opts: {
   temperature?: number;
   topP?: number;
   frequencyPenalty?: number;
-  presencePenalty?: number;
 }) {
   const apiKey = process.env.XAI_API_KEY;
   if (!apiKey) {
@@ -41,7 +40,6 @@ async function callXai(opts: {
   };
   if (opts.topP != null) payload.top_p = opts.topP;
   if (opts.frequencyPenalty != null) payload.frequency_penalty = opts.frequencyPenalty;
-  if (opts.presencePenalty != null) payload.presence_penalty = opts.presencePenalty;
   const res = await fetch("https://api.x.ai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -97,7 +95,6 @@ export const Route = createFileRoute("/api/grok")({
             temperature: p?.temperature,
             topP: p?.topP,
             frequencyPenalty: p?.frequencyPenalty,
-            presencePenalty: p?.presencePenalty,
           });
           if (!result.ok) {
             return Response.json({ ok: false, error: result.error }, { status: 500 });
@@ -168,7 +165,6 @@ export const Route = createFileRoute("/api/grok")({
           temperature: p?.temperature,
           topP: p?.topP,
           frequencyPenalty: p?.frequencyPenalty,
-          presencePenalty: p?.presencePenalty,
         });
         if (!result.ok) return Response.json({ ok: false, error: result.error }, { status: 500 });
         const json = (await result.res.json()) as {

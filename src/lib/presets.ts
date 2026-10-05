@@ -19,6 +19,7 @@ export function migrateFavorite(raw: unknown): FavoriteItem | null {
       params: f.params,
       blobId: f.blobId,
       createdAt: f.createdAt || Date.now(),
+      ...(typeof f.order === "number" ? { order: f.order } : {}),
     };
   }
   return {
@@ -27,6 +28,7 @@ export function migrateFavorite(raw: unknown): FavoriteItem | null {
     params: { ...defaultPureParams(), promptMid: f.prompt || "", seed: f.seed ?? null },
     blobId: f.blobId,
     createdAt: f.createdAt || Date.now(),
+    ...(typeof f.order === "number" ? { order: f.order } : {}),
   };
 }
 

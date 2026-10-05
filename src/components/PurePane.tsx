@@ -8,7 +8,7 @@ import { fakePureChat, useApp } from "@/lib/store";
 import { promptPreview } from "@/lib/presets";
 import type { FavoriteItem, HistoryItem, ImageParams } from "@/lib/types";
 import { afterPaint, generateNai, genPhaseLabel, imageFailText } from "@/lib/engine";
-import { downloadBlob, randomSeed, uid, sortHistoryNewestFirst } from "@/lib/utils";
+import { autoScrollNearEdge, downloadBlob, indexFromY, moveId, nearestScroller, randomSeed, sortHistoryNewestFirst, uid } from "@/lib/utils";
 import { ParamsPane } from "./ParamsPane";
 import { IconBtn, PrimaryBtn, TextInput, useCooldown } from "./ui-kit";
 
@@ -218,6 +218,16 @@ function Sheet({
   );
 }
 
+function GripBars() {
+  return (
+    <span className="flex flex-col items-center justify-center gap-[3.5px] text-current" aria-hidden>
+      <span className="h-[2px] w-4 rounded-full bg-current" />
+      <span className="h-[2px] w-4 rounded-full bg-current" />
+      <span className="h-[2px] w-4 rounded-full bg-current" />
+    </span>
+  );
+}
+
 function FavSheet({
   currentBlob,
   onClose,
@@ -225,9 +235,186 @@ function FavSheet({
   currentBlob?: string;
   onClose: () => void;
 }) {
-  const favorites = sortHistoryNewestFirst(useApp((s) => s.favorites));
+  const favorites = useApp((s) => s.favorites);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [sortMode, setSortMode] = useState(false);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [holdId, setHoldId] = useState<string | null>(null);
+  const [liveIds, setLiveIds] = useState<string[] | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const pressTimer = useRef(0);
+  const press = useRef<{ y: number } | null>(null);
+  const tapRef = useRef(false);
+  const idsRef = useRef<string[]>([]);
+  const dragIdRef = useRef<string | null>(null);
+  const sortRef = useRef(false);
+  const savedRef = useRef(true);
+  const lastY = useRef(0);
+  const rafRef = useRef(0);
+
+  const displayIds = liveIds ?? favorites.map((f) => f.id);
+  const byId = new Map(favorites.map((f) => [f.id, f]));
+  const rows = displayIds.map((id) => byId.get(id)).filter((f): f is FavoriteItem => Boolean(f));
   const current = favorites.find((f) => f.id === openId);
+
+  const persist = () => {
+    if (savedRef.current || !idsRef.current.length) return;
+    savedRef.current = true;
+    useApp.getState().reorderFavorites(idsRef.current);
+  };
+
+  const close = () => {
+    persist();
+    onClose();
+  };
+
+  useEffect(() => {
+    sortRef.current = sortMode;
+  }, [sortMode]);
+
+  useEffect(() => {
+    if (sortMode || dragId) {
+      const known = new Set(idsRef.current);
+      const added = favorites.map((f) => f.id).filter((id) => !known.has(id));
+      const kept = idsRef.current.filter((id) => favorites.some((f) => f.id === id));
+      if (added.length || kept.length !== idsRef.current.length) {
+        idsRef.current = [...added, ...kept];
+        setLiveIds(idsRef.current);
+      }
+      return;
+    }
+    idsRef.current = favorites.map((f) => f.id);
+    setLiveIds(null);
+  }, [favorites, sortMode, dragId]);
+
+  useEffect(() => {
+    if (!sortMode) return;
+    const applyY = (y: number) => {
+      const id = dragIdRef.current;
+      if (!id) return;
+      const nodes = listRef.current?.querySelectorAll<HTMLElement>("[data-card-id]");
+      if (!nodes?.length) return;
+      const next = moveId(idsRef.current, id, indexFromY(nodes, y));
+      if (next.join("\0") === idsRef.current.join("\0")) return;
+      idsRef.current = next;
+      setLiveIds(next);
+    };
+    const lockScroller = (on: boolean) => {
+      const el = nearestScroller(listRef.current);
+      if (el) el.style.touchAction = on ? "none" : "";
+    };
+    const tick = () => {
+      rafRef.current = 0;
+      if (!dragIdRef.current) return;
+      const scroller = nearestScroller(listRef.current);
+      const dy = scroller ? autoScrollNearEdge(scroller, lastY.current) : 0;
+      applyY(lastY.current);
+      if (dy) rafRef.current = requestAnimationFrame(tick);
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!dragIdRef.current) return;
+      e.preventDefault();
+      lastY.current = e.clientY;
+      const scroller = nearestScroller(listRef.current);
+      const dy = scroller ? autoScrollNearEdge(scroller, e.clientY) : 0;
+      applyY(e.clientY);
+      if (dy && !rafRef.current) rafRef.current = requestAnimationFrame(tick);
+    };
+    const onUp = () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+      lockScroller(false);
+      if (!dragIdRef.current) return;
+      dragIdRef.current = null;
+      setDragId(null);
+      savedRef.current = false;
+      persist();
+    };
+    window.addEventListener("pointermove", onMove, { passive: false });
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [sortMode]);
+
+  useEffect(() => {
+    return () => {
+      window.clearTimeout(pressTimer.current);
+      persist();
+    };
+  }, []);
+
+  const clearPress = () => {
+    window.clearTimeout(pressTimer.current);
+    press.current = null;
+    setHoldId(null);
+  };
+
+  const enterSort = () => {
+    if (favorites.length < 2) return;
+    idsRef.current = liveIds ?? favorites.map((f) => f.id);
+    savedRef.current = false;
+    sortRef.current = true;
+    tapRef.current = false;
+    setLiveIds(idsRef.current);
+    setSortMode(true);
+    setHoldId(null);
+    try {
+      navigator.vibrate?.(12);
+    } catch {
+      /* */
+    }
+  };
+
+  const onRowPointerDown = (e: PE<HTMLElement>, id: string) => {
+    if (sortRef.current) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    clearPress();
+    tapRef.current = true;
+    if (favorites.length < 2) return;
+    press.current = { y: e.clientY };
+    setHoldId(id);
+    pressTimer.current = window.setTimeout(enterSort, HOLD_MS);
+  };
+
+  const onRowPointerMove = (e: PE<HTMLElement>) => {
+    const p = press.current;
+    if (!p || sortRef.current) return;
+    if (Math.abs(e.clientY - p.y) > 12) {
+      tapRef.current = false;
+      clearPress();
+    }
+  };
+
+  const onRowPointerUp = (id: string) => {
+    const tap = tapRef.current && !sortRef.current;
+    tapRef.current = false;
+    clearPress();
+    if (tap) setOpenId(id);
+  };
+
+  const onGripDown = (e: PE<HTMLElement>, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    idsRef.current = liveIds ?? favorites.map((f) => f.id);
+    setLiveIds(idsRef.current);
+    savedRef.current = false;
+    dragIdRef.current = id;
+    setDragId(id);
+    lastY.current = e.clientY;
+    const el = nearestScroller(listRef.current);
+    if (el) el.style.touchAction = "none";
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      /* */
+    }
+  };
+
   if (current) {
     return (
       <FavDetail
@@ -242,7 +429,7 @@ function FavSheet({
   return (
     <Sheet
       title="收藏"
-      onClose={onClose}
+      onClose={close}
       extra={
         <button
           className="rounded-full border border-line bg-card px-3 py-1 text-[12px]"
@@ -252,17 +439,38 @@ function FavSheet({
         </button>
       }
     >
-      <div className="flex flex-col gap-2">
-        {favorites.map((f) => (
-          <button
+      <div ref={listRef} className="flex flex-col gap-2">
+        {rows.map((f) => (
+          <div
             key={f.id}
-            className="flex items-center gap-3 rounded-[18px] border border-line bg-card px-3 py-2 text-left"
-            onClick={() => setOpenId(f.id)}
+            data-card-id={f.id}
+            className={`flex items-center gap-3 rounded-[18px] border border-line bg-card px-3 py-2 text-left select-none ${dragId === f.id ? "bg-ink/15" : ""} ${!sortMode && holdId === f.id ? "bg-ink/8" : ""}`}
+            style={{ touchAction: sortMode ? "pan-y" : "manipulation" }}
+            onPointerDown={(e) => onRowPointerDown(e, f.id)}
+            onPointerMove={onRowPointerMove}
+            onPointerUp={() => onRowPointerUp(f.id)}
+            onPointerCancel={() => {
+              tapRef.current = false;
+              clearPress();
+            }}
+            onContextMenu={(e) => e.preventDefault()}
           >
             <RatioThumb blobId={f.blobId} w={f.params.width} h={f.params.height} />
             <div className="min-w-0 flex-1 truncate text-[14px]">{f.name}</div>
-            <span className="text-[16px] text-muted">›</span>
-          </button>
+            {sortMode ? (
+              <button
+                type="button"
+                className="flex size-8 shrink-0 items-center justify-center text-ink/55"
+                aria-label="拖动排序"
+                style={{ touchAction: "none" }}
+                onPointerDown={(e) => onGripDown(e, f.id)}
+              >
+                <GripBars />
+              </button>
+            ) : (
+              <span className="text-[16px] text-muted">›</span>
+            )}
+          </div>
         ))}
         {favorites.length === 0 && <div className="py-10 text-center text-[13px] text-muted">还没有收藏。点右上角保存当前参数。</div>}
       </div>
@@ -315,7 +523,7 @@ function FavDetail({
               className="h-11 flex-1 rounded-full bg-ink text-[14px] font-medium text-bg"
               onClick={() => {
                 const next = structuredClone(fav.params);
-                if (next.seed != null) next.seedLocked = true;
+                next.seedLocked = false;
                 useApp.getState().setPureParams(next);
                 useApp.getState().toast("已填入");
                 onFill();

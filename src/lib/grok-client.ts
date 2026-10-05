@@ -81,7 +81,7 @@ async function grokOnceRaw(body: Record<string, unknown>, signal?: AbortSignal) 
     body: JSON.stringify({
       ...rest,
       stream: false,
-      params: ownParams ?? (presetOn ? s.llmParams : undefined),
+      params: ownParams ?? (presetOn && rest.task !== "image" ? s.llmParams : undefined),
     }),
     signal,
   });
@@ -155,7 +155,7 @@ async function grokStreamRaw(
     : {
         ...body,
         stream: true,
-        params: ownParams ?? (presetOn ? s.llmParams : undefined),
+        params: ownParams ?? (presetOn && body.task !== "image" ? s.llmParams : undefined),
       };
 
   const res = await fetch(url, {

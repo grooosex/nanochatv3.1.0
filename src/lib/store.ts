@@ -29,6 +29,18 @@ import { uid, sortHistoryNewestFirst } from "./utils";
 import { migrateFavorite, presetNameFrom } from "./presets";
 import { settleStuckImages } from "./image-status";
 
+function sortFavorites(items: FavoriteItem[]) {
+  return [...items].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || (b.createdAt || 0) - (a.createdAt || 0));
+}
+
+function orderFavorites(items: FavoriteItem[]) {
+  if (!items.length) return [];
+  if (items.every((f) => typeof f.order === "number")) return sortFavorites(items);
+  const next = sortHistoryNewestFirst(items).map((f, i) => ({ ...f, order: i }));
+  for (const f of next) void db.favorites.put(f);
+  return next;
+}
+
 function copyRoleBody(dst: Character, src: Character): Character {
   return {
     ...dst,
@@ -138,6 +150,7 @@ interface State {
   addFavorite: (blobId?: string) => void;
   patchFavorite: (id: string, p: Partial<FavoriteItem>) => void;
   deleteFavorite: (id: string) => void;
+  reorderFavorites: (ids: string[]) => void;
   setFavoriteThumb: (id: string, blobId: string) => void;
   addHistory: (h: HistoryItem) => void;
   patchHistory: (id: string, p: Partial<HistoryItem>) => void;
@@ -238,7 +251,7 @@ export const useApp = create<State>((set, get) => ({
       ...data,
       settings: nextSettings,
       chats: live,
-      favorites: sortHistoryNewestFirst((data.favorites ?? []).map(migrateFavorite).filter(Boolean) as FavoriteItem[]),
+      favorites: orderFavorites((data.favorites ?? []).map(migrateFavorite).filter(Boolean) as FavoriteItem[]),
       pureParams: normalizePureParams((pureRow?.value as ImageParams) ?? defaultPureParams()),
       currentId,
       history: sortHistoryNewestFirst(data.history ?? []),
@@ -704,17 +717,20 @@ export const useApp = create<State>((set, get) => ({
           if (p.seed != null) p.seedLocked = true;
           return p;
         })();
+    const list = get().favorites;
+    const top = list.reduce((m, f) => Math.min(m, f.order ?? 0), 0);
     const f: FavoriteItem = {
       id: uid("fav_"),
       name: presetNameFrom(params),
       params,
       blobId,
       createdAt: Date.now(),
+      order: list.length ? top - 1 : 0,
     };
     void (async () => {
       try {
         await db.favorites.put(f);
-        set((s) => ({ favorites: sortHistoryNewestFirst([f, ...s.favorites]) }));
+        set((s) => ({ favorites: sortFavorites([f, ...s.favorites]) }));
         get().toast("已保存");
       } catch (err) {
         get().toast(err instanceof Error ? err.message : "收藏失败");
@@ -730,7 +746,7 @@ export const useApp = create<State>((set, get) => ({
       try {
         await db.favorites.put(next);
         set((s) => ({
-          favorites: sortHistoryNewestFirst(s.favorites.map((f) => (f.id === id ? next : f))),
+          favorites: sortFavorites(s.favorites.map((f) => (f.id === id ? next : f))),
         }));
       } catch (err) {
         get().toast(err instanceof Error ? err.message : "收藏更新失败");
@@ -744,6 +760,13 @@ export const useApp = create<State>((set, get) => ({
     void db.favorites.delete(id);
     if (row?.blobId && !blobInUse(get(), row.blobId, id)) void deleteImage(row.blobId);
     get().toast("已删除");
+  },
+
+  reorderFavorites: (ids) => {
+    const rank = new Map(ids.map((id, i) => [id, i]));
+    const next = sortFavorites(get().favorites.map((f) => (rank.has(f.id) ? { ...f, order: rank.get(f.id)! } : f)));
+    set({ favorites: next });
+    for (const f of next) void db.favorites.put(f);
   },
 
   setFavoriteThumb: (id, blobId) => {

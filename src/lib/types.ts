@@ -208,6 +208,7 @@ export interface FavoriteItem {
   params: ImageParams;
   blobId?: string;
   createdAt: number;
+  order?: number;
 }
 
 export interface HistoryItem {

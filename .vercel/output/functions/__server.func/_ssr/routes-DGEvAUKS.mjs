@@ -1,24 +1,596 @@
 import { i as __toESM, n as __exportAll } from "../_runtime.mjs";
-import { $ as samplerPatch, A as downloadBlob, B as loadAll, C as chatPickerModels, D as defaultPureParams, E as defaultImageParams, F as imageUrl, G as parseChatCompletionPreset, H as moveId, I as imageWriteFields, J as putImage, K as presetStyle, L as indexFromY, N as imageAiLabel, O as defaultSettings, P as imagePickerModels, Q as restoreSampler, R as joinPromptParts, S as cachedUrl, T as db, U as nearestScroller, V as migrateGrokId, W as normalizePureParams, X as rememberUrl, Y as randomSeed, Z as resolveImageWrite, _ as UNCENSORED_TAG, a as DEFAULT_STATUS_BAR, b as applyLlmPick, c as FURRY_TAG, d as NOISE_SCHEDULES, et as shortModelLabel, f as PLACEHOLDERS, g as UC, h as SENSITIVE_PREFIX, i as DEFAULT_NAI_BASE, it as uniquePresetName, j as emptyCharacter, k as deleteImage, l as GROK_MODELS, m as SAMPLERS, n as DEFAULT_GROK, nt as uid, o as FOLLOW_IMAGE_AI, p as RESOLUTIONS, q as pruneStarred, r as DEFAULT_LLM_PARAMS, rt as uniqueNumberedName, s as FULLBODY_TAG, t as COOLDOWN_MS, tt as snapshotLlmAccount, u as NAI_MODELS, v as activePreset, w as cn, x as autoScrollNearEdge, y as applyImageAiPick, z as llmIdentity } from "./idb-BhegYRS5.mjs";
-import { R as require_react, l as require_react_dom, y as require_jsx_runtime } from "../_libs/@tanstack/react-router+[...].mjs";
+import { d as require_react_dom, q as require_react, x as require_jsx_runtime } from "../_libs/@tanstack/react-router+[...].mjs";
 import { i as zipSync, n as strToU8, r as unzipSync, t as strFromU8 } from "../_libs/fflate.mjs";
 import { A as ChevronLeft, C as FileUp, D as Clock, E as Copy, F as ArrowDown, I as AlignJustify, M as Check, N as Bookmark, O as ChevronUp, P as ArrowUp, S as FolderInput, T as Download, _ as Lock, a as Trash2, b as Folder, c as Sparkles, d as ScanSearch, f as RefreshCw, g as Menu, h as Moon, j as ChevronDown, k as ChevronRight, l as SlidersHorizontal, m as Pencil, n as WandSparkles, o as Sun, p as Plus, r as Upload, s as Star, t as X, u as Settings, v as LoaderCircle, w as Ellipsis, x as FolderPlus, y as GitBranch } from "../_libs/lucide-react.mjs";
-import { a as chatContextBlock, c as groupFormatHint, i as IMAGE_SHOT_RULES, l as roleSnapshot, n as FIELD_LABELS, o as chatImageSystem, r as IMAGE_BG_RULES, s as fieldPolishHint, u as splitChatPrompt } from "./router-B7589vDb.mjs";
+import { A as NOISE_SCHEDULES, B as joinPromptParts, C as FURRY_TAG, D as NAI_HOP_TIMEOUT_MS, E as IMAGE_GEN_TIMEOUT_MS, F as UC, G as __exportAll$1, H as migrateGrokId, I as UNCENSORED_TAG, L as defaultImageParams, M as RESOLUTIONS, N as SAMPLERS, O as NAI_MODELS, P as SENSITIVE_PREFIX, R as defaultPureParams, S as FULLBODY_TAG, T as IMAGE_DRAW_TIMEOUT_MS, U as normalizePureParams, V as mergeLlmParams, W as shortModelLabel, _ as COOLDOWN_MS, a as IMAGE_SHOT_RULES, b as DEFAULT_NAI_BASE, c as fieldPolishHint, d as imageLengthRules, f as imageWriteMaxTokens, g as voicePolishExtra, h as splitChatPrompt, i as IMAGE_MULTI_RULES, j as PLACEHOLDERS, k as NAI_POLL_MS, l as groupFormatHint, m as roleSnapshot, n as FIELD_LABELS, o as chatContextBlock, p as multiInsertInstruction, r as IMAGE_BG_RULES, s as chatImageSystem, u as imageApplyRules, v as DEFAULT_GROK, w as GROK_MODELS$1, x as DEFAULT_STATUS_BAR, y as DEFAULT_LLM_PARAMS, z as emptyCharacter } from "./router-Wq2WyM9m.mjs";
+import { t as Dexie } from "../_libs/dexie.mjs";
+import { t as clsx } from "../_libs/clsx.mjs";
+import { t as twMerge } from "../_libs/tailwind-merge.mjs";
 import { t as create } from "../_libs/zustand.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/routes-h7rF3gxm.js
-var routes_h7rF3gxm_exports = /* @__PURE__ */ __exportAll({
-	a: () => editMessage,
-	c: () => retryMemory,
+//#region node_modules/.nitro/vite/services/ssr/assets/idb-CfkjCpub.js
+function cn(...inputs) {
+	return twMerge(clsx(inputs));
+}
+function uid(prefix = "") {
+	return `${prefix}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
+function sortHistoryNewestFirst(items) {
+	return [...items].sort((a, b) => {
+		const dt = (b.createdAt || 0) - (a.createdAt || 0);
+		if (dt) return dt;
+		return String(b.id || "").localeCompare(String(a.id || ""));
+	});
+}
+function uniqueNumberedName(desired, taken) {
+	const base = desired.trim();
+	const set = new Set(taken);
+	if (!set.has(base)) return base;
+	let n = 2;
+	while (set.has(`${base}${n}`)) n++;
+	return `${base}${n}`;
+}
+function downloadBlob(blob, filename) {
+	const url = URL.createObjectURL(blob);
+	const a = document.createElement("a");
+	a.href = url;
+	a.download = filename;
+	document.body.appendChild(a);
+	a.click();
+	a.remove();
+	setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+function randomSeed() {
+	return Math.floor(Math.random() * 2 ** 32);
+}
+function moveId(ids, id, to) {
+	const from = ids.indexOf(id);
+	if (from < 0) return ids;
+	const next = ids.slice();
+	next.splice(from, 1);
+	next.splice(Math.max(0, Math.min(next.length, to)), 0, id);
+	return next;
+}
+function indexFromY(rows, y) {
+	if (!rows.length) return 0;
+	for (let i = 0; i < rows.length; i++) {
+		const box = rows[i].getBoundingClientRect();
+		if (y < box.top + box.height / 2) return i;
+	}
+	return rows.length - 1;
+}
+function nearestScroller(el) {
+	let n = el;
+	while (n && n !== document.body) {
+		const oy = getComputedStyle(n).overflowY;
+		if (oy === "auto" || oy === "scroll" || oy === "overlay") return n;
+		n = n.parentElement;
+	}
+	return null;
+}
+function autoScrollNearEdge(scroller, clientY, edge = 52) {
+	const box = scroller.getBoundingClientRect();
+	const max = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+	if (max <= 0) return 0;
+	let dy = 0;
+	if (clientY < box.top + edge) dy = -Math.min(28, Math.max(3, (box.top + edge - clientY) * .4));
+	else if (clientY > box.bottom - edge) dy = Math.min(28, Math.max(3, (clientY - (box.bottom - edge)) * .4));
+	if (!dy) return 0;
+	const next = Math.max(0, Math.min(max, scroller.scrollTop + dy));
+	const applied = next - scroller.scrollTop;
+	scroller.scrollTop = next;
+	return applied;
+}
+var PLACEHOLDER_IDS = /* @__PURE__ */ new Set([
+	"worldInfoBefore",
+	"worldInfoAfter",
+	"charDescription",
+	"charPersonality",
+	"scenario",
+	"personaDescription",
+	"dialogueExamples",
+	"chatHistory",
+	"charDepthPrompt",
+	"personalityFormat",
+	"scenarioFormat"
+]);
+function rec$1(v) {
+	return v && typeof v === "object" && !Array.isArray(v) ? v : null;
+}
+function num$1(v) {
+	if (typeof v === "number" && Number.isFinite(v)) return v;
+	if (typeof v === "string" && v.trim() !== "") {
+		const n = Number(v);
+		if (Number.isFinite(n)) return n;
+	}
+}
+function str$1(v) {
+	return typeof v === "string" ? v : "";
+}
+function parseStPresets(raw) {
+	if (!Array.isArray(raw)) return [];
+	const out = [];
+	for (const row of raw) {
+		const o = rec$1(row);
+		if (!o) continue;
+		if (typeof o.id !== "string" || typeof o.name !== "string") continue;
+		out.push({
+			id: o.id,
+			name: o.name,
+			systemPrompt: str$1(o.systemPrompt),
+			postHistory: str$1(o.postHistory),
+			params: {
+				temperature: num$1(o.params && rec$1(o.params)?.temperature),
+				topP: num$1(o.params && rec$1(o.params)?.topP),
+				frequencyPenalty: num$1(o.params && rec$1(o.params)?.frequencyPenalty),
+				presencePenalty: num$1(o.params && rec$1(o.params)?.presencePenalty),
+				maxTokens: num$1(o.params && rec$1(o.params)?.maxTokens)
+			}
+		});
+	}
+	return out;
+}
+function isTextCompletion(raw) {
+	return typeof raw.input_sequence === "string" || typeof raw.output_sequence === "string" || typeof raw.system_prompt === "string" || Array.isArray(raw.seq);
+}
+function isCharacterCard(raw) {
+	return str$1(raw.spec).startsWith("chara_card") || Boolean(rec$1(raw.data)?.character_book) || Boolean(raw.first_mes);
+}
+function readPrompt(v) {
+	const o = rec$1(v);
+	if (!o) return null;
+	const identifier = str$1(o.identifier) || str$1(o.name) || uid("p_");
+	const content = str$1(o.content) || str$1(o.prompt);
+	return {
+		identifier,
+		name: str$1(o.name) || identifier,
+		content,
+		marker: o.marker === true,
+		role: str$1(o.role).toLowerCase() || "system",
+		injectionPosition: num$1(o.injection_position) ?? 0
+	};
+}
+function enabledOrder(raw, prompts) {
+	const byId = new Map(prompts.map((p) => [p.identifier, p]));
+	const orders = Array.isArray(raw.prompt_order) ? raw.prompt_order : [];
+	let order = [];
+	for (const entry of orders) {
+		const o = rec$1(entry);
+		if (!o || !Array.isArray(o.order)) continue;
+		if (o.character_id === 1e5 || o.character_id === "100000" || !order.length) order = o.order;
+		if (o.character_id === 1e5 || o.character_id === "100000") break;
+	}
+	if (!order.length) return prompts;
+	const out = [];
+	const seen = /* @__PURE__ */ new Set();
+	for (const row of order) {
+		const o = rec$1(row);
+		if (!o) continue;
+		if (o.enabled === false) continue;
+		const id = str$1(o.identifier);
+		const p = byId.get(id);
+		if (!p || seen.has(id)) continue;
+		seen.add(id);
+		out.push(p);
+	}
+	return out;
+}
+function isPostHistory(p) {
+	const id = p.identifier.toLowerCase();
+	const name = p.name.toLowerCase();
+	return id === "jailbreak" || name.includes("post-history") || name.includes("post history") || p.injectionPosition === 1;
+}
+function isPlaceholder(p) {
+	if (p.marker) return true;
+	if (PLACEHOLDER_IDS.has(p.identifier)) return true;
+	return false;
+}
+function parseChatCompletionPreset(raw, fileName) {
+	const o = rec$1(raw);
+	if (!o) throw new Error("这不是对话补全预设");
+	if (isCharacterCard(o)) throw new Error("这是角色卡，不是对话补全预设");
+	if (!Array.isArray(o.prompts)) {
+		if (isTextCompletion(o)) throw new Error("这不是对话补全预设");
+		throw new Error("这不是对话补全预设");
+	}
+	const enabled = enabledOrder(o, o.prompts.map(readPrompt).filter((p) => Boolean(p))).filter((p) => !isPlaceholder(p) && p.content.trim());
+	const systemParts = [];
+	const postParts = [];
+	for (const p of enabled) if (isPostHistory(p)) postParts.push(p.content.trim());
+	else systemParts.push(p.content.trim());
+	if (!systemParts.length && !postParts.length) throw new Error("这份预设没有可导入的提示词");
+	const stem = fileName.replace(/\.json$/i, "").trim() || "未命名预设";
+	return {
+		id: uid("st_"),
+		name: stem,
+		systemPrompt: systemParts.join("\n\n"),
+		postHistory: postParts.join("\n\n"),
+		params: {
+			temperature: num$1(o.temperature),
+			topP: num$1(o.top_p) ?? num$1(o.topP),
+			frequencyPenalty: num$1(o.frequency_penalty) ?? num$1(o.frequencyPenalty),
+			presencePenalty: num$1(o.presence_penalty) ?? num$1(o.presencePenalty),
+			maxTokens: num$1(o.openai_max_tokens) ?? num$1(o.max_tokens) ?? num$1(o.maxTokens)
+		}
+	};
+}
+function uniquePresetName(desired, existing) {
+	return uniqueNumberedName(desired, existing);
+}
+function macroContext(chat) {
+	const chars = chat?.characters ?? [];
+	const names = chars.map((c) => c.name.trim()).filter(Boolean);
+	const personas = chars.map((c) => c.persona.trim()).filter(Boolean);
+	return {
+		char: names.join("、"),
+		isMulti: Boolean(chat?.isMulti && chars.length > 1),
+		scenario: chat?.opening?.trim() ?? "",
+		personality: personas.join("\n\n")
+	};
+}
+function substituteMacros(text, ctx) {
+	if (!text) return "";
+	return text.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_full, rawKey) => {
+		const key = rawKey.trim().toLowerCase().split(":")[0]?.trim() ?? "";
+		if (key === "user" || key === "username") return "你";
+		if (key === "char" || key === "bot" || key === "character") return ctx.char;
+		if (key === "charifnotgroup") return ctx.isMulti ? "" : ctx.char;
+		if (key === "scenario") return ctx.scenario;
+		if (key === "personality") return ctx.personality;
+		return "";
+	});
+}
+function activePreset(settings) {
+	const id = settings.stActiveId;
+	if (!id) return null;
+	return (settings.stPresets ?? []).find((p) => p.id === id) ?? null;
+}
+function samplerPatch(params, current) {
+	return {
+		...current,
+		temperature: params.temperature ?? current.temperature,
+		topP: params.topP ?? current.topP,
+		frequencyPenalty: params.frequencyPenalty ?? current.frequencyPenalty,
+		presencePenalty: params.presencePenalty ?? current.presencePenalty,
+		maxTokens: params.maxTokens ?? current.maxTokens
+	};
+}
+function restoreSampler(snapshot, current) {
+	if (!snapshot) return current;
+	return {
+		...current,
+		temperature: snapshot.temperature,
+		topP: snapshot.topP,
+		frequencyPenalty: snapshot.frequencyPenalty,
+		presencePenalty: snapshot.presencePenalty,
+		maxTokens: snapshot.maxTokens
+	};
+}
+function presetStyle(settings, task, chat) {
+	if (task === "image" || task === "memory" || task === "rewrite") return {};
+	const preset = activePreset(settings);
+	if (!preset) return {};
+	const ctx = macroContext(chat);
+	const sys = substituteMacros(preset.systemPrompt, ctx).trim();
+	const post = substituteMacros(preset.postHistory, ctx).trim();
+	if (task === "chat") return {
+		styleExtra: sys || void 0,
+		postHistory: post || void 0
+	};
+	return { styleExtra: [sys, post].filter(Boolean).join("\n\n") || void 0 };
+}
+/** Chat top-bar: current pick, then starred models that are still listed. */
+function chatPickerModels(starred, available, current) {
+	const avail = new Set(available);
+	const ids = [];
+	if (current) ids.push(current);
+	for (const id of starred) if (avail.has(id) && !ids.includes(id)) ids.push(id);
+	return ids;
+}
+/** Drop stars that left the catalog. Keep `current` if it is still the active pick. */
+function pruneStarred(starred, available, current) {
+	const avail = new Set(available);
+	const seen = /* @__PURE__ */ new Set();
+	const out = [];
+	for (const id of starred) {
+		if (!id || seen.has(id)) continue;
+		if (avail.has(id) || id === current) {
+			seen.add(id);
+			out.push(id);
+		}
+	}
+	return out;
+}
+function snapshotLlmAccount(accounts, base, key, starred, model) {
+	const b = base.trim();
+	if (!b && !key) return accounts;
+	return accounts.map((a) => a.base.trim() === b && a.key === key ? {
+		...a,
+		starred: [...starred],
+		model
+	} : a);
+}
+function applyLlmPick(s, id) {
+	const keep = s.llmModels.includes(id) ? void 0 : id;
+	const llmStarred = pruneStarred(s.llmStarred, s.llmModels, keep);
+	return {
+		llmModel: id,
+		llmStarred,
+		chatSource: "api",
+		llmAccounts: snapshotLlmAccount(s.llmAccounts ?? [], s.llmBase, s.llmKey, llmStarred, id)
+	};
+}
+var FOLLOW_IMAGE_AI = "__follow__";
+var IMAGE_HDR_GROK = "__hdr_grok__";
+var IMAGE_HDR_API = "__hdr_api__";
+function llmIdentity(base, key) {
+	return `${base.trim()}\n${key}`;
+}
+function isGrokModelId(id) {
+	return GROK_MODELS$1.some((m) => m.id === id);
+}
+function isGrokish(id) {
+	return isGrokModelId(id) || id.startsWith("grok-");
+}
+function imageAiLabel(id) {
+	if (!id || id === "__follow__") return "与聊天一致";
+	const g = GROK_MODELS$1.find((m) => m.id === id);
+	if (g) return g.short;
+	return shortModelLabel(id);
+}
+function grokList() {
+	return GROK_MODELS$1.map((m) => m.id);
+}
+function pushOpt(rows, seen, id, danger = false) {
+	if (!id || seen.has(id)) return;
+	seen.add(id);
+	rows.push(danger ? {
+		id,
+		danger: true
+	} : { id });
+}
+function imagePickerModels(input) {
+	const grok = grokList();
+	const grokSet = new Set(grok);
+	const apiOn = Boolean(input.llmConnected);
+	const api = apiOn ? chatPickerModels(input.llmStarred, input.llmModels, input.llmModel) : [];
+	const apiSet = new Set(api);
+	const catalog = new Set(input.llmModels);
+	const pick = input.imageModelId || "";
+	const leftover = pick && pick !== "__follow__" && !grokSet.has(pick) && !apiSet.has(pick) ? pick : "";
+	const extraGrok = leftover && isGrokish(leftover) ? leftover : "";
+	const extraApi = leftover && !isGrokish(leftover) ? leftover : "";
+	const apiDanger = Boolean(extraApi && (!apiOn || !catalog.has(extraApi)));
+	const grokDanger = Boolean(extraGrok && !grokSet.has(extraGrok));
+	const rows = [];
+	const seen = /* @__PURE__ */ new Set();
+	pushOpt(rows, seen, FOLLOW_IMAGE_AI);
+	const appendGrok = (headed) => {
+		const list = extraGrok ? [...grok, extraGrok] : grok;
+		if (headed) rows.push({
+			id: IMAGE_HDR_GROK,
+			header: "Grok"
+		});
+		for (const id of list) pushOpt(rows, seen, id, id === extraGrok && grokDanger);
+	};
+	const appendApi = (headed) => {
+		const list = extraApi ? [...api, extraApi] : api;
+		if (!list.length) return;
+		if (headed) rows.push({
+			id: IMAGE_HDR_API,
+			header: "API"
+		});
+		for (const id of list) pushOpt(rows, seen, id, id === extraApi && apiDanger);
+	};
+	if (input.chatSource === "api") {
+		appendApi(false);
+		appendGrok(true);
+	} else {
+		appendGrok(false);
+		appendApi(true);
+	}
+	return rows;
+}
+function applyImageAiPick(current, pick) {
+	const pin = current.imageModelPin || null;
+	if (!pick || pick === "__follow__") return {
+		imageModelId: null,
+		imageModelPin: pin
+	};
+	return {
+		imageModelId: pick,
+		imageModelPin: isGrokModelId(pick) ? pin : pick
+	};
+}
+function imageWriteFields(imageModelId) {
+	const dest = resolveImageWrite(imageModelId);
+	if (!dest.split) return {};
+	if (dest.via === "grok") return {
+		via: "grok",
+		grokModelId: dest.grokModelId
+	};
+	return {
+		via: "api",
+		model: dest.model
+	};
+}
+function resolveImageWrite(imageModelId) {
+	if (!imageModelId) return { split: false };
+	if (isGrokModelId(imageModelId)) return {
+		split: true,
+		via: "grok",
+		grokModelId: imageModelId
+	};
+	return {
+		split: true,
+		via: "api",
+		model: imageModelId
+	};
+}
+var idb_exports = /* @__PURE__ */ __exportAll$1({
+	cachedUrl: () => cachedUrl,
+	db: () => db,
+	defaultSettings: () => defaultSettings,
+	deleteImage: () => deleteImage,
+	getImage: () => getImage,
+	imageUrl: () => imageUrl,
+	loadAll: () => loadAll,
+	putImage: () => putImage,
+	rememberUrl: () => rememberUrl
+});
+var defaultSettings = () => ({
+	grokModelId: DEFAULT_GROK,
+	chatSource: "grok",
+	llmBase: "",
+	llmKey: "",
+	llmConnected: false,
+	llmModel: "",
+	llmModels: [],
+	llmStarred: [],
+	llmAccounts: [],
+	llmParams: { ...DEFAULT_LLM_PARAMS },
+	llmIdentity: "",
+	stPresets: [],
+	stActiveId: null,
+	stParamSnapshot: null,
+	naiKey: "",
+	naiBase: DEFAULT_NAI_BASE,
+	naiConnected: false,
+	cooldownUntil: 0,
+	chatImage: true,
+	imageModelId: null,
+	imageModelPin: null,
+	theme: "light"
+});
+var HuiyuDB = class extends Dexie {
+	chats;
+	folders;
+	cards;
+	appearances;
+	favorites;
+	history;
+	images;
+	kv;
+	constructor() {
+		super("huiyu");
+		this.version(1).stores({
+			chats: "id, folderId, order, updatedAt",
+			folders: "id, order",
+			cards: "id, order",
+			appearances: "id, order",
+			favorites: "id, createdAt",
+			history: "id, createdAt",
+			images: "id",
+			kv: "key"
+		});
+	}
+};
+var db = new HuiyuDB();
+function parseLlmAccounts(raw) {
+	if (!Array.isArray(raw)) return [];
+	const out = [];
+	for (const row of raw) {
+		if (!row || typeof row !== "object") continue;
+		const a = row;
+		if (typeof a.id !== "string" || typeof a.name !== "string") continue;
+		out.push({
+			id: a.id,
+			name: a.name,
+			base: typeof a.base === "string" ? a.base : "",
+			key: typeof a.key === "string" ? a.key : "",
+			starred: Array.isArray(a.starred) ? a.starred.filter((id) => typeof id === "string") : void 0,
+			model: typeof a.model === "string" ? a.model : void 0
+		});
+	}
+	return out;
+}
+async function loadAll() {
+	const [chats, folders, cards, appearances, favorites, history, settingsRow] = await Promise.all([
+		db.chats.toArray(),
+		db.folders.toArray(),
+		db.cards.toArray(),
+		db.appearances.toArray(),
+		db.favorites.toArray(),
+		db.history.toArray(),
+		db.kv.get("settings")
+	]);
+	const raw = settingsRow?.value ?? void 0;
+	const stPresets = parseStPresets(raw?.stPresets);
+	const stActiveId = typeof raw?.stActiveId === "string" && stPresets.some((p) => p.id === raw.stActiveId) ? raw.stActiveId : null;
+	return {
+		chats,
+		folders,
+		cards,
+		appearances,
+		favorites,
+		history,
+		settings: {
+			...defaultSettings(),
+			...raw ?? {},
+			grokModelId: migrateGrokId(raw?.grokModelId),
+			llmParams: mergeLlmParams(raw?.llmParams),
+			llmModels: raw?.llmModels ?? [],
+			llmStarred: raw?.llmStarred ?? [],
+			llmAccounts: parseLlmAccounts(raw?.llmAccounts),
+			stPresets,
+			stActiveId,
+			stParamSnapshot: stActiveId && raw?.stParamSnapshot ? mergeLlmParams(raw.stParamSnapshot) : null,
+			chatSource: raw?.chatSource === "api" && raw?.llmConnected ? "api" : "grok",
+			chatImage: raw?.chatImage !== false,
+			imageModelId: typeof raw?.imageModelId === "string" ? raw.imageModelId : null,
+			imageModelPin: typeof raw?.imageModelPin === "string" ? raw.imageModelPin : null,
+			llmIdentity: typeof raw?.llmIdentity === "string" && raw.llmIdentity ? raw.llmIdentity : raw?.llmConnected && raw?.llmBase && raw?.llmKey ? llmIdentity(String(raw.llmBase), String(raw.llmKey)) : ""
+		}
+	};
+}
+async function putImage(id, blob) {
+	await db.images.put({
+		id,
+		blob
+	});
+}
+async function getImage(id) {
+	return (await db.images.get(id))?.blob ?? null;
+}
+async function deleteImage(id) {
+	await db.images.delete(id);
+}
+var urlCache = /* @__PURE__ */ new Map();
+async function imageUrl(id) {
+	if (!id) return null;
+	const cached = urlCache.get(id);
+	if (cached) return cached;
+	const blob = await getImage(id);
+	if (!blob) return null;
+	const url = URL.createObjectURL(blob);
+	urlCache.set(id, url);
+	return url;
+}
+function rememberUrl(id, blob) {
+	const prev = urlCache.get(id);
+	if (prev) URL.revokeObjectURL(prev);
+	const url = URL.createObjectURL(blob);
+	urlCache.set(id, url);
+	return url;
+}
+function cachedUrl(id) {
+	return id ? urlCache.get(id) ?? null : null;
+}
+//#endregion
+//#region node_modules/.nitro/vite/services/ssr/assets/routes-DGEvAUKS.js
+var routes_DGEvAUKS_exports = /* @__PURE__ */ __exportAll({
+	a: () => cancelMemory,
+	c: () => regenMessage,
 	component: () => Home,
-	d: () => sendUser,
-	i: () => cancelMemory,
-	l: () => runManualMemory,
+	d: () => sendOpening,
+	f: () => sendUser,
+	i: () => cancelImage,
+	l: () => retryMemory,
 	n: () => attachImage,
-	o: () => invalidateMemory,
+	o: () => editMessage,
 	r: () => branchFrom,
-	s: () => regenMessage,
+	s: () => invalidateMemory,
 	t: () => abortChat,
-	u: () => sendOpening
+	u: () => runManualMemory
 });
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
@@ -176,7 +748,9 @@ function extrasFrom(raw) {
 		const body = str(o.body) || str(o.text) || str(o.title);
 		return {
 			id: str(o.id, `ex_${i}`),
-			body
+			body,
+			...o.applyImage === true ? { applyImage: true } : {},
+			...o.emphasize === true ? { emphasize: true } : {}
 		};
 	});
 }
@@ -254,6 +828,7 @@ function charactersFromDraft(draft, imageParams) {
 			speech: str(o.speech),
 			appearance: str(o.appearance),
 			extras: extrasFrom(o.extras),
+			personaVoices: bool(o.personaVoices),
 			imageEnabled: o.away === true ? false : o.imageEnabled !== false,
 			prompt: str(o.prompt, pc?.prompt ?? ""),
 			uc: str(o.uc, pc?.uc ?? ""),
@@ -273,6 +848,7 @@ function charactersFromDraft(draft, imageParams) {
 		speech: str(draft.speech) || str(first?.speech),
 		appearance: str(draft.appearance) || str(first?.appearance),
 		extras: extrasFrom(first?.extras),
+		personaVoices: bool(first?.personaVoices ?? draft.personaVoices),
 		prompt: str(first?.prompt, pc?.prompt ?? ""),
 		uc: str(first?.uc, pc?.uc ?? ""),
 		x: num(first?.x ?? pc?.x, .5),
@@ -567,8 +1143,7 @@ async function exportArchive(kind) {
 			...h,
 			blobId: void 0
 		}));
-		const blob = new Blob([JSON.stringify(dump)], { type: "application/json" });
-		downloadBlob(blob, `绘语-无配图-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json`);
+		downloadBlob(new Blob([JSON.stringify(dump)], { type: "application/json" }), `绘语-无配图-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json`);
 		return;
 	}
 	const files = { "huiyu.json": strToU8(JSON.stringify(dump)) };
@@ -824,6 +1399,51 @@ function buildNaiPayload(opts) {
 		characterPrompts
 	};
 }
+function buildIdlecloudBody(built, params, insertMode = "insert") {
+	const body = {
+		model: built.model,
+		positivePrompt: built.finalPrompt,
+		negativePrompt: params.negative,
+		width: params.width,
+		height: params.height,
+		steps: params.steps,
+		scale: params.scale,
+		sampler: params.sampler,
+		seed: built.seed,
+		noise_schedule: params.noiseSchedule,
+		promptGuidanceRescale: params.cfgRescale,
+		sm: false,
+		sm_dyn: false,
+		autoSmea: false,
+		decrisp: params.decrisper,
+		variety: params.varietyPlus,
+		prefer_brownian: params.sampler.includes("ancestral") || params.sampler.includes("sde"),
+		deliberate_euler_ancestral_bug: false,
+		legacy: false,
+		legacy_uc: false,
+		legacy_v3_extend: false,
+		use_coords: params.useCoords,
+		use_upscale_credits: false
+	};
+	if (naiFamily(params.model) !== "v3" && insertMode === "insert" && built.characterPrompts.length > 0) {
+		body.characterPrompts = built.characterPrompts;
+		body.v4_prompt_char_captions = built.characterPrompts.map((c) => ({
+			char_caption: c.prompt,
+			centers: [{
+				x: c.center.x,
+				y: c.center.y
+			}]
+		}));
+		body.v4_negative_prompt_char_captions = built.characterPrompts.map((c) => ({
+			char_caption: c.uc,
+			centers: [{
+				x: c.center.x,
+				y: c.center.y
+			}]
+		}));
+	}
+	return body;
+}
 function syncCharsFromRole(params, roles, isMulti) {
 	if (!isMulti) return {
 		...params,
@@ -833,8 +1453,8 @@ function syncCharsFromRole(params, roles, isMulti) {
 		const prev = params.characters.find((c) => c.id === r.id);
 		return {
 			id: r.id,
-			name: r.name || prev?.name || "",
-			enabled: r.imageEnabled,
+			name: r.name,
+			enabled: prev ? prev.enabled : r.imageEnabled,
 			prompt: prev?.prompt || r.prompt || r.appearance || "",
 			uc: prev?.uc || r.uc || "",
 			x: prev?.x ?? r.x ?? .5,
@@ -1130,6 +1750,21 @@ function replyContextText(raw) {
 	return [p.body, ...extra].filter(Boolean).join("\n\n");
 }
 var MEMORY_CHAR_CAP = 3800;
+var MEMORY_PARAMS = {
+	temperature: .3,
+	topP: 1,
+	frequencyPenalty: 0,
+	presencePenalty: 0,
+	maxTokens: 4096
+};
+function memoryFailReason(e) {
+	const err = e;
+	if (err?.name === "AbortError") return "已取消";
+	const msg = err?.message || "";
+	if (msg === "memory-invalid") return "回得太短或不像备忘";
+	if (msg === "memory-skip") return "没有可收的对白";
+	return msg || "请求失败";
+}
 function clipMemoryText(text) {
 	const t = text.trim();
 	if (t.length <= 3800) return t;
@@ -1218,6 +1853,77 @@ var emptyMemory = () => ({
 	memoryFoldAt: 0,
 	memorySnaps: []
 });
+function settleStuckImages(chat) {
+	let dirty = false;
+	const messages = chat.messages.map((m) => {
+		let imgDirty = false;
+		const images = m.images.map((g) => {
+			if (g.status === "done" || g.status === "error") return g;
+			imgDirty = true;
+			return {
+				...g,
+				status: "error",
+				error: "上次生图未完成"
+			};
+		});
+		if (!imgDirty) return m;
+		dirty = true;
+		return {
+			...m,
+			images
+		};
+	});
+	return dirty ? {
+		...chat,
+		messages
+	} : chat;
+}
+function isAbort(e) {
+	return (e instanceof DOMException || e instanceof Error) && e.name === "AbortError";
+}
+function imageFailText(e, signal) {
+	if (signal?.aborted) return "已取消";
+	if (isAbort(e)) return "生图超时";
+	return e instanceof Error ? e.message : "生图失败";
+}
+function prettyImageError(error) {
+	const raw = (error ?? "").trim();
+	if (!raw) return "生图失败";
+	let msg = raw;
+	if (raw.startsWith("{")) try {
+		const j = JSON.parse(raw);
+		if (typeof j.message === "string" && j.message.trim()) msg = j.message.trim();
+	} catch {}
+	if (/too many concurrent/i.test(msg) || /rate limit/i.test(msg) || /"statusCode"\s*:\s*429/.test(raw)) return "请求太频繁";
+	if (/<!doctype|<html|internal server error/i.test(raw)) return "中转站返回了异常页面";
+	return msg;
+}
+function genPhaseLabel(status, error) {
+	if (status === "writing") return "写提示词中";
+	if (status === "uploading") return "上传中";
+	if (status === "generating") return "生图中";
+	if (status === "receiving") return "回传中";
+	if (status === "error") return prettyImageError(error);
+	return "";
+}
+function copyRoleBody(dst, src) {
+	return {
+		...dst,
+		persona: src.persona,
+		speech: src.speech,
+		appearance: src.appearance,
+		personaVoices: src.personaVoices ?? dst.personaVoices,
+		extras: src.extras ?? dst.extras
+	};
+}
+function mergeCardCharacters(current, incoming) {
+	const next = current.map((ch, i) => incoming[i] ? copyRoleBody(ch, incoming[i]) : ch);
+	for (let i = current.length; i < incoming.length; i++) {
+		const src = incoming[i];
+		if (src) next.push({ ...src });
+	}
+	return next;
+}
 var ui0 = () => ({
 	tab: "chat",
 	sidebar: false,
@@ -1244,7 +1950,8 @@ var ui0 = () => ({
 	autoPolish: false,
 	paramsJump: null,
 	llmSettings: false,
-	memoryHint: null
+	memoryHint: null,
+	editUserMsg: null
 });
 function persistChat(c) {
 	if (c.isDraft) return;
@@ -1265,15 +1972,25 @@ var useApp = create((set, get) => ({
 	editBackup: null,
 	toasts: [],
 	ui: ui0(),
+	composerDrafts: {},
 	hydrate: async () => {
 		const data = await loadAll();
-		const [pureRow, currentRow] = await Promise.all([db.kv.get("pureParams"), db.kv.get("currentId")]);
-		const live = data.chats.filter((c) => !c.isDraft).map((c) => ({
-			...normalizeChatMemory(c),
-			grokModelId: migrateGrokId(c.grokModelId),
-			imageModelId: c.imageModelId || null,
-			imageModelPin: c.imageModelPin || null
-		}));
+		const [pureRow, currentRow, draftsRow] = await Promise.all([
+			db.kv.get("pureParams"),
+			db.kv.get("currentId"),
+			db.kv.get("composerDrafts")
+		]);
+		const live = data.chats.filter((c) => !c.isDraft).map((c) => {
+			const mapped = {
+				...normalizeChatMemory(c),
+				grokModelId: migrateGrokId(c.grokModelId),
+				imageModelId: c.imageModelId || null,
+				imageModelPin: c.imageModelPin || null
+			};
+			const next = settleStuckImages(mapped);
+			if (next !== mapped) persistChat(next);
+			return next;
+		});
 		const settings = {
 			...data.settings,
 			grokModelId: migrateGrokId(data.settings.grokModelId),
@@ -1297,9 +2014,11 @@ var useApp = create((set, get) => ({
 			...data,
 			settings: nextSettings,
 			chats: live,
-			favorites: (data.favorites ?? []).map(migrateFavorite).filter(Boolean),
+			favorites: sortHistoryNewestFirst((data.favorites ?? []).map(migrateFavorite).filter(Boolean)),
 			pureParams: normalizePureParams(pureRow?.value ?? defaultPureParams()),
-			currentId
+			currentId,
+			history: sortHistoryNewestFirst(data.history ?? []),
+			composerDrafts: parseComposerDrafts(draftsRow?.value)
 		});
 	},
 	toast: (text) => {
@@ -1555,18 +2274,26 @@ var useApp = create((set, get) => ({
 		db.chats.bulkPut(moved.filter((c) => !c.isDraft));
 		db.chats.bulkDelete([...ids]);
 		db.folders.bulkDelete([...ids]);
-		set((s) => ({
-			chats: moved,
-			folders,
-			currentId: ids.has(s.currentId || "") ? moved[0]?.id ?? null : s.currentId,
-			ui: {
-				...s.ui,
-				selectMode: false,
-				selected: [],
-				sortMode: false,
-				menuId: null
-			}
-		}));
+		set((s) => {
+			const composerDrafts = dropDrafts(s.composerDrafts, ids);
+			db.kv.put({
+				key: "composerDrafts",
+				value: composerDrafts
+			});
+			return {
+				chats: moved,
+				folders,
+				currentId: ids.has(s.currentId || "") ? moved[0]?.id ?? null : s.currentId,
+				composerDrafts,
+				ui: {
+					...s.ui,
+					selectMode: false,
+					selected: [],
+					sortMode: false,
+					menuId: null
+				}
+			};
+		});
 		get().toast("已删除");
 	},
 	starSelected: () => {
@@ -1750,17 +2477,16 @@ var useApp = create((set, get) => ({
 	applyCard: (chatId, card, charIndex) => {
 		get().patchChat(chatId, (c) => {
 			if (c.isMulti && !card.isMulti && charIndex != null) {
-				const chars = c.characters.map((ch, i) => i === charIndex ? {
-					...ch,
-					...card.characters[0],
-					id: ch.id,
-					extras: card.characters[0]?.extras ?? ch.extras
-				} : ch);
+				const src = card.characters[0];
+				const characters = src ? c.characters.map((ch, i) => i === charIndex ? copyRoleBody(ch, src) : ch) : c.characters;
 				return {
 					...c,
-					characters: chars
+					characters,
+					imageParams: syncCharsFromRole(c.imageParams, characters, c.isMulti),
+					updatedAt: Date.now()
 				};
 			}
+			const characters = mergeCardCharacters(c.characters, card.characters);
 			return {
 				...c,
 				isMulti: card.isMulti,
@@ -1770,11 +2496,9 @@ var useApp = create((set, get) => ({
 				statusBarOn: card.statusBarOn,
 				statusBar: card.statusBar,
 				grokModelId: card.grokModelId,
-				characters: structuredClone(card.characters).map((ch, i) => ({
-					...ch,
-					id: c.characters[i]?.id ?? ch.id
-				})),
-				name: card.isMulti ? card.characters.map((x) => x.name).filter(Boolean).join("、") : card.characters[0]?.name || card.name
+				characters,
+				imageParams: syncCharsFromRole(c.imageParams, characters, card.isMulti),
+				updatedAt: Date.now()
 			};
 		});
 		get().toast(`已应用「${card.name}」`);
@@ -1891,20 +2615,31 @@ var useApp = create((set, get) => ({
 			blobId,
 			createdAt: Date.now()
 		};
-		db.favorites.put(f);
-		set((s) => ({ favorites: [f, ...s.favorites] }));
-		get().toast("已保存");
+		(async () => {
+			try {
+				await db.favorites.put(f);
+				set((s) => ({ favorites: sortHistoryNewestFirst([f, ...s.favorites]) }));
+				get().toast("已保存");
+			} catch (err) {
+				get().toast(err instanceof Error ? err.message : "收藏失败");
+			}
+		})();
 	},
 	patchFavorite: (id, p) => {
-		set((s) => {
-			const favorites = s.favorites.map((f) => f.id === id ? {
-				...f,
-				...p
-			} : f);
-			const row = favorites.find((f) => f.id === id);
-			if (row) db.favorites.put(row);
-			return { favorites };
-		});
+		const row = get().favorites.find((f) => f.id === id);
+		if (!row) return;
+		const next = {
+			...row,
+			...p
+		};
+		(async () => {
+			try {
+				await db.favorites.put(next);
+				set((s) => ({ favorites: sortHistoryNewestFirst(s.favorites.map((f) => f.id === id ? next : f)) }));
+			} catch (err) {
+				get().toast(err instanceof Error ? err.message : "收藏更新失败");
+			}
+		})();
 	},
 	deleteFavorite: (id) => {
 		const row = get().favorites.find((f) => f.id === id);
@@ -1921,7 +2656,7 @@ var useApp = create((set, get) => ({
 	},
 	addHistory: (h) => {
 		db.history.put(h);
-		set((s) => ({ history: [h, ...s.history].slice(0, 200) }));
+		set((s) => ({ history: sortHistoryNewestFirst([h, ...s.history]).slice(0, 200) }));
 	},
 	patchHistory: (id, p) => {
 		set((s) => {
@@ -1940,8 +2675,31 @@ var useApp = create((set, get) => ({
 		db.history.delete(id);
 		if (row?.blobId && !blobInUse(get(), row.blobId)) deleteImage(row.blobId);
 	},
-	setCooldown: (until) => get().setSettings({ cooldownUntil: until })
+	setCooldown: (until) => get().setSettings({ cooldownUntil: until }),
+	setComposerDraft: (chatId, text) => {
+		set((s) => {
+			const composerDrafts = { ...s.composerDrafts };
+			if (text) composerDrafts[chatId] = text;
+			else delete composerDrafts[chatId];
+			db.kv.put({
+				key: "composerDrafts",
+				value: composerDrafts
+			});
+			return { composerDrafts };
+		});
+	}
 }));
+function parseComposerDrafts(raw) {
+	if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+	const out = {};
+	for (const [k, v] of Object.entries(raw)) if (k && typeof v === "string" && v) out[k] = v;
+	return out;
+}
+function dropDrafts(drafts, ids) {
+	const next = { ...drafts };
+	for (const id of ids) delete next[id];
+	return next;
+}
 function liftImageAi(settings, chats, currentId) {
 	if (settings.imageModelId || settings.imageModelPin) return {
 		imageModelId: settings.imageModelId ?? null,
@@ -2024,7 +2782,29 @@ async function readJsonError(res, fallback) {
 		return fallback;
 	}
 }
-async function grokOnce(body, signal) {
+var writeChain = Promise.resolve();
+function enqueueWrite(fn, signal) {
+	const run = () => {
+		if (signal?.aborted) {
+			const err = /* @__PURE__ */ new Error("Aborted");
+			err.name = "AbortError";
+			return Promise.reject(err);
+		}
+		return fn();
+	};
+	const next = writeChain.then(run, run);
+	writeChain = next.then(() => void 0, () => void 0);
+	return next;
+}
+function shouldQueue(task) {
+	return task === "memory" || task === "image" || task === "rewrite";
+}
+function abortError() {
+	const err = /* @__PURE__ */ new Error("Aborted");
+	err.name = "AbortError";
+	return err;
+}
+async function grokOnceRaw(body, signal) {
 	const s = useApp.getState().settings;
 	const presetOn = Boolean(s.stActiveId);
 	const viaBody = body.via;
@@ -2032,7 +2812,10 @@ async function grokOnce(body, signal) {
 	const rest = { ...body };
 	delete rest.via;
 	delete rest.model;
-	if ((viaBody === "api" || viaBody === "grok" ? viaBody : s.chatSource) === "api") {
+	const via = viaBody === "api" || viaBody === "grok" ? viaBody : s.chatSource;
+	const ownParams = rest.params && typeof rest.params === "object" ? rest.params : null;
+	const maxFromOwn = typeof ownParams?.maxTokens === "number" ? ownParams.maxTokens : void 0;
+	if (via === "api") {
 		const model = modelBody || s.llmModel;
 		if (!s.llmKey) throw new Error("还没连接对话 API");
 		if (!model) throw new Error("还没选择模型");
@@ -2044,10 +2827,10 @@ async function grokOnce(body, signal) {
 				baseUrl: s.llmBase,
 				apiKey: s.llmKey,
 				model,
-				params: s.llmParams,
 				...rest,
+				params: ownParams ?? s.llmParams,
 				stream: false,
-				max_tokens: rest.max_tokens ?? s.llmParams.maxTokens
+				max_tokens: rest.max_tokens ?? maxFromOwn ?? s.llmParams.maxTokens
 			}),
 			signal
 		});
@@ -2061,13 +2844,17 @@ async function grokOnce(body, signal) {
 		body: JSON.stringify({
 			...rest,
 			stream: false,
-			params: presetOn ? s.llmParams : void 0
+			params: ownParams ?? (presetOn ? s.llmParams : void 0)
 		}),
 		signal
 	});
 	const data = await res.json();
 	if (!res.ok || !data.ok) throw new Error(data.error || `Grok 请求失败 ${res.status}`);
 	return data.text ?? "";
+}
+async function grokOnce(body, signal) {
+	if (shouldQueue(body.task)) return enqueueWrite(() => grokOnceRaw(body, signal), signal);
+	return grokOnceRaw(body, signal);
 }
 function consumeSse(chunk, onDelta, acc) {
 	const line = chunk.split("\n").find((l) => l.startsWith("data: "));
@@ -2086,27 +2873,35 @@ function consumeSse(chunk, onDelta, acc) {
 	}
 }
 async function grokStream(body, onDelta, signal) {
+	const run = () => grokStreamRaw(body, onDelta, signal);
+	if (shouldQueue(body.task)) return enqueueWrite(run, signal);
+	return run();
+}
+async function grokStreamRaw(body, onDelta, signal) {
+	if (signal?.aborted) throw abortError();
 	const s = useApp.getState().settings;
-	const api = s.chatSource === "api";
+	const api = (body.via === "api" || body.via === "grok" ? body.via : s.chatSource) === "api";
 	const presetOn = Boolean(s.stActiveId);
 	if (api) {
 		if (!s.llmConnected || !s.llmKey) throw new Error("还没连接对话 API");
-		if (!s.llmModel) throw new Error("还没选择模型");
+		if (!s.llmModel && typeof body.model !== "string") throw new Error("还没选择模型");
 	}
 	const url = api ? "/api/llm" : "/api/grok";
+	const ownParams = body.params && typeof body.params === "object" ? body.params : null;
+	const maxFromOwn = typeof ownParams?.maxTokens === "number" ? ownParams.maxTokens : void 0;
 	const payload = api ? {
 		action: "chat",
 		baseUrl: s.llmBase,
 		apiKey: s.llmKey,
-		model: s.llmModel,
-		params: s.llmParams,
+		model: typeof body.model === "string" ? body.model : s.llmModel,
 		...body,
+		params: ownParams ?? s.llmParams,
 		stream: true,
-		max_tokens: body.max_tokens ?? s.llmParams.maxTokens
+		max_tokens: body.max_tokens ?? maxFromOwn ?? s.llmParams.maxTokens
 	} : {
 		...body,
 		stream: true,
-		params: presetOn ? s.llmParams : void 0
+		params: ownParams ?? (presetOn ? s.llmParams : void 0)
 	};
 	const res = await fetch(url, {
 		method: "POST",
@@ -2265,7 +3060,8 @@ function buildPolishUserContent(chat) {
 		persona: c.persona,
 		speech: c.speech,
 		appearance: c.appearance,
-		appearanceLocked: Boolean(c.appearance.trim())
+		appearanceLocked: Boolean(c.appearance.trim()),
+		personaVoices: Boolean(c.personaVoices)
 	}));
 	const extras = [...chat.extras, ...chat.characters.flatMap((c) => c.extras)].map((e) => e.body.trim()).filter(Boolean);
 	return JSON.stringify({
@@ -2283,6 +3079,8 @@ function buildPolishUserContent(chat) {
 		}
 	}, null, 2);
 }
+var OPENING_USER = "（开始场景，请角色先开口）";
+var CONTINUE_USER = "用户这轮没有发言。这不是开场，也不是结束。接着上一拍已经发生的事往下演，把场上未完的动作、对话、时间往前推，不要空等用户开口，不要问「你想做什么」。需要用户开口或表态时你可以代写或给出选项。不要复述上一拍，不要跳到无关的新故事。";
 function parseUserMarkup(raw) {
 	const facts = [];
 	const directives = [];
@@ -2317,10 +3115,24 @@ function needsMarkupFormat(raw) {
 	if (p.facts.length || p.directives.length) return true;
 	return isShortBareCandidate(p.rest);
 }
-function formatUserForChat(raw) {
+function standingDirectives(chat) {
+	return [...chat.extras || [], ...(chat.characters || []).flatMap((c) => c.extras || [])].map((e) => e.emphasize ? (e.body || "").trim() : "").filter(Boolean);
+}
+function chatAuthorBlock(directives) {
+	return `【作者指令】${directives.map((d) => `《${d}》`).join(" ")}\n角色听不见、不准念、不准写成「听到指示」。只执行与这轮文笔/剧情有关的；与画图、镜头、构图、tag 有关的忽略（生图会另处理）。`;
+}
+function imageAuthorBlock(directives) {
+	return `作者指令：${directives.map((d) => `《${d}》`).join(" ")}（只执行与画面有关的；文笔/篇幅/怎么写的忽略）`;
+}
+function formatUserForChat(raw, standing = []) {
+	const extra = standing.map((s) => s.trim()).filter(Boolean);
 	const t = (raw || "").trim();
-	if (!t || t === "（开始场景，请角色先开口）" || !needsMarkupFormat(t)) return raw;
-	const p = parseUserMarkup(t);
+	if ((!t || t === "（开始场景，请角色先开口）") && extra.length) return `${!t ? CONTINUE_USER : OPENING_USER}\n\n${chatAuthorBlock(extra)}`;
+	if (!t) return CONTINUE_USER;
+	if (t === "（开始场景，请角色先开口）") return raw;
+	const merged = extra.length ? `${t}${extra.map((d) => `《${d}》`).join("")}` : t;
+	if (!needsMarkupFormat(merged)) return raw;
+	const p = parseUserMarkup(merged);
 	const parts = [];
 	if (p.facts.length) parts.push(`【已发生】${p.facts.map((f) => `「${f}」`).join("、")}\n这是本拍必须达成的事实：过程可以写，回复结束时必须已经成立。不是口令。角色不是「听见」这些字；若内容本身是已经说出口的话，她听见的是那句话，不是括号。`);
 	if (p.rest) parts.push(`【用户其余原文】${p.rest}\n请判断：像对角色说的话 → 她听见的台词；像动作/场面补充（摸头、抱住、插入）→ 与【已发生】同一规则，短动词优先当动作。`);
@@ -2328,33 +3140,54 @@ function formatUserForChat(raw) {
 	if (p.facts.length && !p.rest) parts.push("本条没有台词。角色只对已经发生的事实做身体和情绪反应，禁止写成听到一句话或听到指示。");
 	return parts.join("\n\n");
 }
-function formatUserForImage(raw) {
+function formatUserForImage(raw, standing = []) {
+	const extra = standing.map((s) => s.trim()).filter(Boolean);
 	const t = (raw || "").trim();
-	if (!t || t === "（开始场景，请角色先开口）") return "";
-	const p = parseUserMarkup(t);
-	if (!needsMarkupFormat(t)) return `用户：${t}`;
+	if ((!t || t === "（开始场景，请角色先开口）") && !extra.length) return "";
+	if (!t || t === "（开始场景，请角色先开口）") return imageAuthorBlock(extra);
+	const merged = extra.length ? `${t}${extra.map((d) => `《${d}》`).join("")}` : t;
+	if (!needsMarkupFormat(merged)) return `用户：${t}`;
+	const p = parseUserMarkup(merged);
 	const parts = [];
 	if (p.facts.length) parts.push(`用户已发生（镜头里必须是已经发生，不要写成准备、磨蹭或停在入口）：${p.facts.join("；")}`);
 	if (p.rest) parts.push(`用户其余：${p.rest}`);
 	if (p.directives.length) parts.push(`作者指令：${p.directives.map((d) => `《${d}》`).join(" ")}（只执行与画面有关的；文笔/篇幅/怎么写的忽略）`);
 	return parts.join("\n") || `用户：${t}`;
 }
-function recentSceneForImage(messages, n = 4) {
-	return messages.slice(-n).map((m) => {
-		if (m.role === "user") return formatUserForImage(m.content);
+function recentSceneForImage(messages, n = 4, standing = []) {
+	let lastUser = -1;
+	for (let i = messages.length - 1; i >= 0; i--) if (messages[i].role === "user") {
+		lastUser = i;
+		break;
+	}
+	const slice = messages.slice(-n);
+	const offset = messages.length - slice.length;
+	return slice.map((m, i) => {
+		if (m.role === "user") return formatUserForImage(m.content, offset + i === lastUser ? standing : []);
 		if (m.role === "narrator") return m.content ? `旁白：${replyContextText(m.content)}` : "";
 		return `${m.characterName || "角色"}：${replyContextText(m.content)}`;
 	}).filter(Boolean).join("\n");
 }
 /** 本镜 = this assistant reply (or override); residual = last 4 bubbles before it. */
-function shotAndResidual(messages, msgId, shotOverride) {
+function shotAndResidual(messages, msgId, shotOverride, standing = []) {
 	const idx = messages.findIndex((m) => m.id === msgId);
 	const msg = idx >= 0 ? messages[idx] : void 0;
 	const before = idx >= 0 ? messages.slice(0, idx) : messages;
 	return {
 		shot: (shotOverride ?? (msg ? replyStoryText(msg.content) : "")).trim(),
-		residual: recentSceneForImage(before, 4)
+		residual: recentSceneForImage(before, 4, standing)
 	};
+}
+/** The user's latest line before this reply. Who is on screen looks at this plus 本镜. */
+function latestUserBefore(messages, msgId, standing = []) {
+	const idx = messages.findIndex((m) => m.id === msgId);
+	const before = idx >= 0 ? messages.slice(0, idx) : messages;
+	for (let i = before.length - 1; i >= 0; i--) {
+		if (before[i].role !== "user") continue;
+		const text = formatUserForImage(before[i].content, standing).trim();
+		if (text) return text;
+	}
+	return "";
 }
 /** Immediate previous assistant/narrator only. Empty if that round has no successful image. */
 function previousRoundImagePrompt(messages, msgId) {
@@ -2575,16 +3408,9 @@ function assignCharTags(rawChars, characters) {
 			used.add(id);
 		} else unmatched.push(tags);
 	}
-	let i = 0;
-	for (const c of characters) {
-		if (used.has(c.id)) continue;
-		if (i >= unmatched.length) break;
-		mapped[c.id] = unmatched[i++];
-		used.add(c.id);
-	}
 	return {
 		mapped,
-		leftover: unmatched.slice(i).join(", ")
+		leftover: unmatched.join(", ")
 	};
 }
 function resolveAbsentIds(absent, characters) {
@@ -2597,6 +3423,32 @@ function resolveAbsentIds(absent, characters) {
 			return m ? characters[Number(m[1]) - 1] : void 0;
 		})();
 		if (hit && !ids.includes(hit.id)) ids.push(hit.id);
+	}
+	return ids;
+}
+function presenceFromTags(mappedIds, absentIds) {
+	if (mappedIds.length) {
+		const absent = new Set(absentIds);
+		return {
+			mode: "exact",
+			ids: mappedIds.filter((id) => !absent.has(id))
+		};
+	}
+	if (absentIds.length) return {
+		mode: "off",
+		ids: absentIds
+	};
+}
+function legacyPresentIds(text, characters) {
+	const found = /* @__PURE__ */ new Set();
+	const re = /\bchar(?:acter)?\s*(\d+)\s*:/gi;
+	let m;
+	while (m = re.exec(text)) found.add(Number(m[1]));
+	if (!found.size) return void 0;
+	const ids = [];
+	for (const n of [...found].sort((a, b) => a - b)) {
+		const c = characters[n - 1];
+		if (c && !ids.includes(c.id)) ids.push(c.id);
 	}
 	return ids;
 }
@@ -2626,9 +3478,16 @@ function foldWindow() {
 function historyMessages(chat, upto) {
 	const msgs = chat.messages.slice(0, upto ?? chat.messages.length);
 	const start = Math.max(0, msgs.length - recentWindow());
-	return msgs.slice(start).filter((m) => m.role !== "narrator" || m.content).map((m) => ({
+	const recent = msgs.slice(start).filter((m) => m.role !== "narrator" || m.content);
+	const standing = standingDirectives(chat);
+	let lastUser = -1;
+	for (let i = recent.length - 1; i >= 0; i--) if (recent[i].role === "user") {
+		lastUser = i;
+		break;
+	}
+	return recent.map((m, i) => ({
 		role: m.role === "user" ? "user" : "assistant",
-		content: m.role === "user" ? formatUserForChat(m.content) : stripSpeakerPrefix(replyContextText(m.content), [
+		content: m.role === "user" ? formatUserForChat(m.content, i === lastUser ? standing : []) : stripSpeakerPrefix(replyContextText(m.content), [
 			m.characterName,
 			chat.name,
 			...chat.characters.map((c) => c.name),
@@ -2638,18 +3497,21 @@ function historyMessages(chat, upto) {
 }
 async function polishAll(chat, grokModelId, instruction) {
 	const style = presetStyle(useApp.getState().settings, "polish", chat);
+	const voice = voicePolishExtra(chat);
+	const extra = [voice, instruction?.trim() || ""].filter(Boolean).join("\n\n") || void 0;
 	return parsePolishJson(await grokOnce({
 		task: instruction?.trim() ? "personalize" : "polish",
 		grokModelId,
-		extraSystem: instruction?.trim() || void 0,
+		extraSystem: extra,
 		messages: [{
 			role: "user",
 			content: buildPolishUserContent(chat)
 		}],
-		...style
+		...style,
+		...voice ? { max_tokens: 6e3 } : {}
 	}));
 }
-async function polishField(chat, grokModelId, field, instruction, charId) {
+async function polishField(chat, grokModelId, field, instruction, charId, onDelta) {
 	const char = charId ? chat.characters.find((c) => c.id === charId) : void 0;
 	const charIndex = charId ? chat.characters.findIndex((c) => c.id === charId) : -1;
 	let current = "";
@@ -2658,24 +3520,28 @@ async function polishField(chat, grokModelId, field, instruction, charId) {
 	else if (field === "opening") current = chat.opening;
 	else if (field === "statusBar") current = chat.statusBar;
 	const charLabel = char && chat.isMulti ? `角色${charIndex + 1}${char.name ? "「" + char.name + "」" : ""}` : char ? char.name ? `角色「${char.name}」` : "角色" : void 0;
-	return extractFieldText(await grokOnce({
+	const voices = field === "persona" && Boolean(char?.personaVoices);
+	const payload = {
 		task: "field",
 		grokModelId,
 		extraSystem: fieldPolishHint({
 			field,
 			instruction,
 			current,
-			charLabel
+			charLabel,
+			voices
 		}),
 		messages: [{
 			role: "user",
 			content: roleSnapshot(chat)
 		}],
-		max_tokens: 2e3,
+		max_tokens: voices ? 4500 : 2e3,
 		...presetStyle(useApp.getState().settings, "field", chat)
-	}), field);
+	};
+	if (voices && onDelta) return extractFieldText(await grokStream(payload, (t) => onDelta(stripRoleOutput(t))), field);
+	return extractFieldText(await grokOnce(payload), field);
 }
-async function summarizeMemory(chat, grokModelId, slice, previous, signal) {
+async function summarizeMemory(chat, grokModelId, slice, previous, signal, onDelta) {
 	const keep = recentWindow();
 	const older = slice ?? chat.messages.slice(0, Math.max(0, chat.messages.length - keep));
 	if (older.length < 2) throw new Error("memory-skip");
@@ -2687,13 +3553,15 @@ async function summarizeMemory(chat, grokModelId, slice, previous, signal) {
 		task: "memory",
 		grokModelId,
 		...imageWriteFields(s.imageModelId),
+		params: MEMORY_PARAMS,
+		max_tokens: MEMORY_PARAMS.maxTokens,
 		messages: [{
 			role: "user",
 			content: `上一份备忘：\n${previous ?? chat.memory ?? "（无）"}\n\n需要收进去的对白：\n${dialog}`
 		}]
 	};
 	if (!dest.split) payload.grokModelId = grokModelId;
-	const clipped = clipMemoryText(await grokOnce(payload, signal));
+	const clipped = clipMemoryText(await grokStream(payload, (t) => onDelta?.(t), signal));
 	if (!isPlausibleMemory(clipped)) throw new Error("memory-invalid");
 	return clipped;
 }
@@ -2703,31 +3571,31 @@ function nextFoldSlice(chat) {
 }
 function imageBrief(chat, opts) {
 	const names = chat.characters.map((c) => c.name).filter(Boolean).join("、");
-	const roster = chat.characters.map((c, i) => `${i + 1}. ${c.name || `角色${i + 1}`}`).join("\n");
-	const format = chat.isMulti && chat.promptMode === "insert" ? `输出 JSON（不要 markdown）：{"base":"地点写最前，然后人数场景镜头光线","chars":{${chat.characters.map((c) => `"${c.name || c.id}":"..."`).join(",")}},"absent":[]}
-chars 的键必须逐字用上面的角色名。不在镜头的角色放进 absent，不要写进 chars。没人离开则 absent 为 []。` : chat.isMulti ? "只输出英文 tag 一行，地点写最前，用 char1: ... char2: ... 区分。禁止 JSON，禁止 ENABLED。" : "只输出英文 tag 一行，地点写最前。禁止 JSON。";
+	const format = chat.isMulti && chat.promptMode === "insert" ? multiInsertInstruction(chat.characters, "brief") : chat.isMulti ? "只输出英文 tag 一行，地点写最前。只给在场的人写 char1: ... char2: ...，不在场的整段省略。禁止 JSON，禁止 ENABLED。" : "只输出英文 tag 一行，地点写最前。禁止 JSON。";
 	const shot = (opts.shot || "").trim();
 	const residual = (opts.residual || opts.last || "").trim();
+	const turnUser = chat.isMulti ? `这一轮用户（只用来判断谁在场；姿势、动作、衣服仍只认本镜）：\n${(opts.turnUser || "").trim() || "（无）"}\n\n` : "";
 	return `角色：${names || "（未命名）"}
 外貌已由用户写好，不要重复（含发色瞳色体型种族整套衣服）。
 成人提示词加强：${chat.adultBoost ? "开" : "关"}
 多人：${chat.isMulti ? "是" : "否"}　插入模式：${chat.promptMode}
-${chat.isMulti ? `角色名单：\n${roster}` : ""}
 
 ${IMAGE_SHOT_RULES}
 
 ${IMAGE_BG_RULES}
 
-写法：先抽出本镜里最显眼的动作/部位，写成具体真 tag，不要收成 ass focus、naughty face 这种安全词。空格真 tag，禁止下划线。不要写画师质量词和外貌。
+${chat.isMulti ? `${IMAGE_MULTI_RULES}\n\n` : ""}写法：先抽出本镜里最显眼的动作/部位，写成具体真 tag，不要收成 ass focus、naughty face 这种安全词。空格真 tag，禁止下划线。不要写画师质量词和外貌。
 用户已发生的动作优先于角色回里写软了的版本，必须写成已经发生，不要停在入口。
-成人开着：把画面写透、写够，不要保守。「不要硬塞」只挡住完全无关的内容。
+成人开着：把画面写成具体真 tag，不要保守。「不要硬塞」只挡住完全无关的内容。
 成人关着：对白里看得见的仍写，不额外堆没写到的特写；完全没有性/血腥则不加 nsfw。
 只输出标签，不要解释。
+
+${imageLengthRules(chat.imageParams.model, chat.adultBoost)}
 
 本镜（姿势、镜头、正在做的事只认这段）：
 ${shot || "（无）"}
 
-${chat.memory.trim() ? `长期记忆（只继承没被推翻的状态，不含地点）：\n${chat.memory.trim()}\n` : ""}残留参考（不要继承已结束的动作/体位/朝向）：
+${turnUser}${chat.memory.trim() ? `长期记忆（只继承没被推翻的状态，不含地点）：\n${chat.memory.trim()}\n` : ""}残留参考（不要继承已结束的动作/体位/朝向，也不要用它决定谁在场）：
 ${residual || "（无）"}
 
 上一镜地点（对白看不出人在哪时才用，只借人所在的地方）：
@@ -2737,13 +3605,13 @@ ${format}`;
 }
 function parseImageTagOutput(text, chat) {
 	const insert = chat.isMulti && chat.promptMode === "insert";
-	const roster = chat.imageParams.characters.length ? chat.imageParams.characters.map((c) => ({
-		id: c.id,
-		name: c.name || ""
-	})) : chat.characters.map((c) => ({
-		id: c.id,
-		name: c.name || ""
-	}));
+	const roster = (chat.imageParams.characters.length ? chat.imageParams.characters : chat.characters).map((c) => {
+		const role = chat.characters.find((r) => r.id === c.id);
+		return {
+			id: c.id,
+			name: (role?.name || c.name || "").trim()
+		};
+	});
 	const json = extractJsonObject(text);
 	if (json && (json.base != null || json.chars != null)) {
 		const rawChars = {};
@@ -2752,25 +3620,41 @@ function parseImageTagOutput(text, chat) {
 		const { mapped, leftover } = assignCharTags(rawChars, roster);
 		const base = sanitizeNaiTags([String(json.base || ""), leftover].filter(Boolean).join(", "));
 		const absent = resolveAbsentIds(json.absent, roster);
-		if (!insert) return {
-			base: sanitizeNaiTags([base, ...Object.values(mapped).filter(Boolean)].filter(Boolean).join(", ")),
-			chars: {},
-			absent: []
-		};
+		const presence = presenceFromTags(Object.keys(mapped), absent);
+		if (!insert) {
+			const absentSet = new Set(absent);
+			return {
+				base: sanitizeNaiTags([base, ...Object.entries(mapped).filter(([id]) => !absentSet.has(id)).map(([, tags]) => tags).filter(Boolean)].filter(Boolean).join(", ")),
+				chars: {},
+				absent,
+				presence
+			};
+		}
 		return {
 			base,
 			chars: mapped,
-			absent
+			absent,
+			presence
 		};
 	}
+	const legacy = chat.isMulti ? legacyPresentIds(text, roster) : void 0;
 	return {
 		base: sanitizeNaiTags(text.replace(/\n/g, ", ")),
 		chars: {},
-		absent: []
+		absent: [],
+		presence: legacy ? {
+			mode: "exact",
+			ids: legacy
+		} : void 0
 	};
 }
-async function writeImageTags(chat, lastText, grokModelId, shotText, prevScene) {
-	const extra = chat.adultBoost ? "成人提示词加强：开。这是最高优先级之一。对白里的动作、部位、体液必须写成具体真 tag，写透（22–40 个），不要收成 ass focus / naughty face。无关内容仍不要加。只输出标签，不要解释。" : "成人提示词加强：关。对白里看得见的仍写具体真 tag，不要额外堆没写到的器官特写。完全没有性/血腥的场面不要加 nsfw。只输出标签，不要解释。";
+async function writeImageTags(chat, lastText, grokModelId, shotText, prevScene, signal, turnUser) {
+	const extra = [
+		chat.adultBoost ? "成人提示词加强：开。这是最高优先级之一。对白里的动作、部位、体液必须写成具体真 tag，不要收成 ass focus / naughty face。无关内容仍不要加。只输出标签，不要解释。" : "成人提示词加强：关。对白里看得见的仍写具体真 tag，不要额外堆没写到的器官特写。完全没有性/血腥的场面不要加 nsfw。只输出标签，不要解释。",
+		imageLengthRules(chat.imageParams.model, chat.adultBoost),
+		chat.isMulti ? IMAGE_MULTI_RULES : "",
+		imageApplyRules(chat)
+	].filter(Boolean).join("\n\n");
 	const imageModelId = useApp.getState().settings.imageModelId;
 	const dest = resolveImageWrite(imageModelId);
 	const payload = {
@@ -2781,25 +3665,83 @@ async function writeImageTags(chat, lastText, grokModelId, shotText, prevScene) 
 			content: imageBrief(chat, {
 				shot: shotText,
 				residual: lastText,
-				prevScene
+				prevScene,
+				turnUser
 			})
 		}],
-		max_tokens: 900,
+		max_tokens: imageWriteMaxTokens(chat.imageParams.model),
 		...imageWriteFields(imageModelId)
 	};
 	if (!dest.split) payload.grokModelId = grokModelId;
-	return parseImageTagOutput(await grokOnce(payload), chat);
+	return parseImageTagOutput(await grokOnce(payload, withImageTimeout(signal)), chat);
 }
-function genPhaseLabel(status, error) {
-	if (status === "writing") return "写提示词中";
-	if (status === "uploading") return "上传中";
-	if (status === "generating") return "生图中";
-	if (status === "receiving") return "回传中";
-	if (status === "error") return error?.trim() || "生图失败";
-	return "";
+function withImageTimeout(user) {
+	const timeout = AbortSignal.timeout(IMAGE_GEN_TIMEOUT_MS);
+	return user ? AbortSignal.any([user, timeout]) : timeout;
 }
 function afterPaint() {
 	return new Promise((r) => requestAnimationFrame(() => r()));
+}
+function sleepMs(ms, signal) {
+	return new Promise((resolve, reject) => {
+		if (signal?.aborted) {
+			reject(new DOMException("Aborted", "AbortError"));
+			return;
+		}
+		const timer = setTimeout(() => {
+			signal?.removeEventListener("abort", onAbort);
+			resolve();
+		}, ms);
+		const onAbort = () => {
+			clearTimeout(timer);
+			reject(new DOMException("Aborted", "AbortError"));
+		};
+		signal?.addEventListener("abort", onAbort, { once: true });
+	});
+}
+function isHopTimeout(e) {
+	return e instanceof Error && e.name === "HopTimeout";
+}
+async function naiHop(body, signal) {
+	const hop = AbortSignal.timeout(NAI_HOP_TIMEOUT_MS);
+	const combined = signal ? AbortSignal.any([signal, hop]) : hop;
+	let res;
+	try {
+		res = await fetch("/api/nai", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(body),
+			signal: combined
+		});
+	} catch (e) {
+		if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+		const name = e instanceof Error || e instanceof DOMException ? e.name : "";
+		if (name === "AbortError" || name === "TimeoutError") {
+			const err = /* @__PURE__ */ new Error("中转站超时，请稍后重试");
+			err.name = "HopTimeout";
+			throw err;
+		}
+		throw new Error(imageFailText(e, signal));
+	}
+	const raw = await res.text();
+	let data;
+	try {
+		data = JSON.parse(raw);
+	} catch {
+		throw new Error("中转站返回了异常页面");
+	}
+	if (!data.ok) throw new Error(data.error || "生图失败");
+	return data;
+}
+async function imageFromB64(b64) {
+	const bin = atob(b64);
+	const arr = new Uint8Array(bin.length);
+	for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+	const blob = new Blob([arr], { type: "image/png" });
+	return {
+		blobId: await saveBlob(blob),
+		blob
+	};
 }
 async function generateNai(opts) {
 	const built = buildNaiPayload({
@@ -2809,35 +3751,84 @@ async function generateNai(opts) {
 		insertMode: opts.chat.promptMode,
 		seed: opts.seed
 	});
+	const payload = buildIdlecloudBody(built, opts.chat.imageParams, opts.chat.promptMode);
 	opts.onStart?.();
-	const data = await (await fetch("/api/nai", {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({
-			action: "generate",
-			baseUrl: opts.baseUrl,
-			apiKey: opts.apiKey,
-			payload: {
-				input: built.input,
-				model: built.model,
-				action: "generate",
-				parameters: built.parameters
-			}
-		})
-	})).json();
-	if (!data.ok || !data.image) throw new Error(data.error || "生图失败");
-	opts.onReceiving?.();
-	await afterPaint();
-	const bin = atob(data.image);
-	const arr = new Uint8Array(bin.length);
-	for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-	const blob = new Blob([arr], { type: "image/png" });
-	return {
-		blobId: await saveBlob(blob),
-		seed: built.seed,
-		prompt: built.finalPrompt,
-		blob
+	const finish = async (b64) => {
+		opts.onReceiving?.();
+		await afterPaint();
+		const saved = await imageFromB64(b64);
+		return {
+			blobId: saved.blobId,
+			seed: built.seed,
+			prompt: built.finalPrompt,
+			blob: saved.blob
+		};
 	};
+	const base = {
+		baseUrl: opts.baseUrl,
+		apiKey: opts.apiKey
+	};
+	const started = Date.now();
+	const timedOut = () => Date.now() - started >= IMAGE_DRAW_TIMEOUT_MS;
+	let submit;
+	while (!submit) {
+		if (timedOut()) throw new Error("生图超时");
+		try {
+			submit = await naiHop({
+				...base,
+				action: "submit",
+				payload
+			}, opts.signal);
+		} catch (e) {
+			if (isHopTimeout(e)) continue;
+			throw e;
+		}
+	}
+	if (submit.image) return finish(submit.image);
+	if (!submit.jobId && !submit.statusUrl && !submit.fileUrl) throw new Error("中转站没有返回任务");
+	let statusUrl = submit.statusUrl;
+	let fileUrl = submit.fileUrl;
+	let v5 = submit.v5;
+	while (!timedOut()) {
+		if (fileUrl) {
+			try {
+				const fetched = await naiHop({
+					...base,
+					action: "fetch",
+					fileUrl,
+					v5
+				}, opts.signal);
+				if (fetched.image) return finish(fetched.image);
+			} catch (e) {
+				if (!isHopTimeout(e)) throw e;
+				continue;
+			}
+			fileUrl = void 0;
+		}
+		let poll;
+		try {
+			poll = await naiHop({
+				...base,
+				action: "poll",
+				jobId: submit.jobId,
+				statusUrl
+			}, opts.signal);
+		} catch (e) {
+			if (isHopTimeout(e)) continue;
+			throw e;
+		}
+		if (poll.statusUrl) statusUrl = poll.statusUrl;
+		if (poll.image) return finish(poll.image);
+		if (poll.fileUrl) {
+			fileUrl = poll.fileUrl;
+			v5 = poll.v5;
+			continue;
+		}
+		const left = IMAGE_DRAW_TIMEOUT_MS - (Date.now() - started);
+		if (left <= 0) break;
+		await sleepMs(Math.min(NAI_POLL_MS, left), opts.signal);
+	}
+	throw new Error("生图超时");
 }
 function parseGroup(text) {
 	if (text.split(/<<<(?:CHAR:([^>]+)|NARRATOR)>>>/g).length === 1) return [{
@@ -2921,6 +3912,10 @@ var busy = /* @__PURE__ */ new Set();
 var memoryEpoch = /* @__PURE__ */ new Map();
 var memoryBusy = /* @__PURE__ */ new Set();
 var memoryAborts = /* @__PURE__ */ new Map();
+var imageAborts = /* @__PURE__ */ new Map();
+function imageKey(chatId, msgId) {
+	return `${chatId}:${msgId}`;
+}
 function chat(id) {
 	return useApp.getState().chats.find((c) => c.id === id);
 }
@@ -2941,7 +3936,6 @@ async function sendOpening(id) {
 }
 async function sendUser(id, text) {
 	const t = text.trim();
-	if (!t) return;
 	abortChat(id);
 	patch(id, (c) => ({
 		...c,
@@ -2952,19 +3946,34 @@ async function sendUser(id, text) {
 function abortChat(id) {
 	aborts.get(id)?.abort();
 	aborts.delete(id);
+	for (const [k, ac] of imageAborts) if (k.startsWith(`${id}:`)) {
+		ac.abort();
+		imageAborts.delete(k);
+	}
+	invalidateMemory(id);
+}
+function cancelImage(chatId, msgId) {
+	imageAborts.get(imageKey(chatId, msgId))?.abort();
 }
 function invalidateMemory(id) {
 	bumpMemoryEpoch(id);
 	memoryAborts.get(id)?.abort();
 	memoryAborts.delete(id);
 	memoryBusy.delete(id);
+	const hint = useApp.getState().ui.memoryHint;
+	if (hint?.chatId === id && hint.state === "generating") useApp.getState().setUI({ memoryHint: null });
 }
 function cancelMemory(id) {
 	memoryAborts.get(id)?.abort();
 	memoryAborts.delete(id);
 	bumpMemoryEpoch(id);
 	memoryBusy.delete(id);
-	if (useApp.getState().ui.memoryHint?.chatId === id) useApp.getState().setUI({ memoryHint: null });
+	const hint = useApp.getState().ui.memoryHint;
+	if (!hint || hint.chatId === id) useApp.getState().setUI({ memoryHint: {
+		chatId: id,
+		state: "fail",
+		error: "已取消"
+	} });
 }
 function retryMemory(id) {
 	runMemory(id);
@@ -3005,7 +4014,7 @@ async function branchFrom(id, msgId) {
 		chats: [...s.chats, copy],
 		currentId: copy.id
 	}));
-	const { db } = await import("./idb-BhegYRS5.mjs").then((n) => n.M).then((n) => n.a);
+	const { db } = await import("../_libs/_.mjs").then((n) => n.a);
 	db.chats.put(copy);
 	useApp.getState().toast(`已开分支「${copy.name}」`);
 }
@@ -3088,7 +4097,7 @@ async function runReply(id, _userText, opening, regen = false) {
 	const msgs = historyMessages(live).filter((m) => m.content);
 	if (opening && msgs.length === 0) msgs.push({
 		role: "user",
-		content: "（开始场景，请角色先开口）"
+		content: formatUserForChat(OPENING_USER, standingDirectives(live))
 	});
 	let raw = "";
 	let promptStarted = false;
@@ -3204,6 +4213,10 @@ async function attachImage(id, msgId, mode = "auto", custom, customChars, parsed
 		});
 		return;
 	}
+	const ac = new AbortController();
+	const key = imageKey(id, msgId);
+	imageAborts.get(key)?.abort();
+	imageAborts.set(key, ac);
 	try {
 		let grokTail = custom ? sanitizeNaiTags(custom, { stripForbidden: false }) : "";
 		let charTails = {};
@@ -3214,19 +4227,20 @@ async function attachImage(id, msgId, mode = "auto", custom, customChars, parsed
 		if (mode !== "custom") {
 			if (parsed) {
 				grokTail = parsed.base;
-				charTails = mapCharTails(c, parsed.chars);
-				applyAbsent(id, parsed.absent);
+				charTails = keepPresentTails(mapCharTails(c, parsed.chars), parsed.presence);
+				applyPresence(id, parsed.presence);
 			} else if (mode === "same" && prev?.prompt) {
 				grokTail = extractGrokTail(prev.prompt, c.imageParams);
 				charTails = { ...prev.charTails || {} };
 			} else {
 				const live = chat(id) ?? c;
-				const { shot, residual } = shotAndResidual(live.messages, msgId, shotText);
+				const standing = standingDirectives(live);
+				const { shot, residual } = shotAndResidual(live.messages, msgId, shotText, standing);
 				const prevScene = previousRoundImagePrompt(live.messages, msgId);
-				const tags = await writeImageTags(live, residual, useApp.getState().settings.grokModelId, shot || msg.content, prevScene);
+				const tags = await writeImageTags(live, residual, useApp.getState().settings.grokModelId, shot || msg.content, prevScene, ac.signal, latestUserBefore(live.messages, msgId, standing));
 				grokTail = tags.base;
-				charTails = mapCharTails(live, tags.chars);
-				applyAbsent(id, tags.absent);
+				charTails = keepPresentTails(mapCharTails(live, tags.chars), tags.presence);
+				applyPresence(id, tags.presence);
 			}
 		}
 		if (!grokTail && !Object.keys(charTails).length) {
@@ -3249,6 +4263,7 @@ async function attachImage(id, msgId, mode = "auto", custom, customChars, parsed
 			seed: img.seed,
 			apiKey: settings.naiKey,
 			baseUrl: settings.naiBase,
+			signal: ac.signal,
 			onStart: () => setImg({ status: "generating" }),
 			onReceiving: () => {
 				useApp.getState().setCooldown(Date.now() + COOLDOWN_MS);
@@ -3275,40 +4290,81 @@ async function attachImage(id, msgId, mode = "auto", custom, customChars, parsed
 			}));
 		}
 	} catch (e) {
+		const err = imageFailText(e, ac.signal);
 		setImg({
 			status: "error",
-			error: e instanceof Error ? e.message : "生图失败"
+			error: err
 		});
+		if (err !== "已取消") useApp.getState().toast(err);
+	} finally {
+		if (imageAborts.get(key) === ac) imageAborts.delete(key);
 	}
 }
 function mapCharTails(c, chars) {
 	const map = {};
 	for (const ch of c.imageParams.characters) {
+		const roleName = c.characters.find((r) => r.id === ch.id)?.name || "";
 		const byId = chars[ch.id];
-		const byName = ch.name ? chars[ch.name] : "";
+		const byName = ch.name && chars[ch.name] || roleName && chars[roleName] || "";
 		if (byId || byName) map[ch.id] = byId || byName;
 	}
 	return map;
 }
-function applyAbsent(id, absent) {
-	if (!absent?.length) return;
-	const off = new Set(absent);
-	patch(id, (ch) => ({
-		...ch,
-		imageParams: {
-			...ch.imageParams,
-			characters: ch.imageParams.characters.map((x) => ({
-				...x,
-				enabled: !off.has(x.id) && !off.has(x.name)
-			}))
-		}
-	}));
+function keepPresentTails(charTails, presence) {
+	if (!presence) return charTails;
+	if (presence.mode === "exact") {
+		const on = new Set(presence.ids);
+		const next = {};
+		for (const [k, v] of Object.entries(charTails)) if (on.has(k)) next[k] = v;
+		return next;
+	}
+	const off = new Set(presence.ids);
+	const next = { ...charTails };
+	for (const id of off) delete next[id];
+	return next;
 }
-function setMemoryHint(chatId, state) {
-	useApp.getState().setUI({ memoryHint: state ? {
+function applyPresence(id, presence) {
+	if (!presence) return;
+	patch(id, (ch) => {
+		const enabledOf = (slotId) => presence.mode === "exact" ? presence.ids.includes(slotId) : !presence.ids.includes(slotId);
+		return {
+			...ch,
+			characters: ch.characters.map((role) => ({
+				...role,
+				imageEnabled: enabledOf(role.id)
+			})),
+			imageParams: {
+				...ch.imageParams,
+				characters: ch.imageParams.characters.map((x) => ({
+					...x,
+					enabled: enabledOf(x.id)
+				}))
+			}
+		};
+	});
+}
+function setMemoryHint(chatId, state, extra) {
+	if (!state) {
+		useApp.getState().setUI({ memoryHint: null });
+		return;
+	}
+	const prev = useApp.getState().ui.memoryHint;
+	const keepDraft = state === "generating" && prev?.chatId === chatId ? prev.draft : void 0;
+	useApp.getState().setUI({ memoryHint: {
 		chatId,
-		state
-	} : null });
+		state,
+		error: extra?.error,
+		draft: extra?.draft ?? keepDraft
+	} });
+}
+function onMemoryDelta(id) {
+	return (t) => {
+		const hint = useApp.getState().ui.memoryHint;
+		if (hint?.chatId === id && hint.state === "generating") useApp.getState().setUI({ memoryHint: {
+			...hint,
+			draft: t
+		} });
+	};
 }
 async function maybeMemory(id) {
 	runMemory(id);
@@ -3326,9 +4382,9 @@ async function runMemory(id) {
 	const ctrl = new AbortController();
 	memoryAborts.set(id, ctrl);
 	memoryBusy.add(id);
-	setMemoryHint(id, "generating");
+	setMemoryHint(id, "generating", { draft: "" });
 	try {
-		const mem = await summarizeMemory(c, useApp.getState().settings.grokModelId, c.messages.slice(slice.start, slice.end), c.memory, ctrl.signal);
+		const mem = await summarizeMemory(c, useApp.getState().settings.grokModelId, c.messages.slice(slice.start, slice.end), c.memory, ctrl.signal, onMemoryDelta(id));
 		if ((memoryEpoch.get(id) ?? 0) !== epoch) return;
 		const live = chat(id);
 		if (!live) return;
@@ -3350,7 +4406,7 @@ async function runMemory(id) {
 	} catch (e) {
 		if (e.name === "AbortError") return;
 		if ((memoryEpoch.get(id) ?? 0) !== epoch) return;
-		setMemoryHint(id, null);
+		setMemoryHint(id, "fail", { error: memoryFailReason(e) });
 	} finally {
 		if (memoryAborts.get(id) === ctrl) memoryAborts.delete(id);
 		memoryBusy.delete(id);
@@ -3366,18 +4422,21 @@ async function runManualMemory(id, mode) {
 		useApp.getState().toast("还不够长，先多聊几轮");
 		return false;
 	}
-	cancelMemory(id);
+	memoryAborts.get(id)?.abort();
+	memoryAborts.delete(id);
+	memoryBusy.delete(id);
 	const epoch = (memoryEpoch.get(id) ?? 0) + 1;
 	memoryEpoch.set(id, epoch);
 	const ctrl = new AbortController();
 	memoryAborts.set(id, ctrl);
 	memoryBusy.add(id);
-	setMemoryHint(id, "generating");
+	setMemoryHint(id, "generating", { draft: "" });
 	try {
 		const grok = useApp.getState().settings.grokModelId;
 		const snaps = c.memorySnaps ?? [];
+		const delta = onMemoryDelta(id);
 		if (mode === "all") {
-			const text = await summarizeMemory(c, grok, c.messages.slice(0, needed), "（无）", ctrl.signal);
+			const text = await summarizeMemory(c, grok, c.messages.slice(0, needed), "（无）", ctrl.signal, delta);
 			patch(id, (ch) => ({
 				...ch,
 				...applySnaps([{
@@ -3395,7 +4454,7 @@ async function runManualMemory(id, mode) {
 			}
 			const prev = snaps[snaps.length - 2];
 			const start = prev?.covered ?? 0;
-			const text = await summarizeMemory(c, grok, c.messages.slice(start, last.covered), prev?.text ?? "（无）", ctrl.signal);
+			const text = await summarizeMemory(c, grok, c.messages.slice(start, last.covered), prev?.text ?? "（无）", ctrl.signal, delta);
 			patch(id, (ch) => ({
 				...ch,
 				...applySnaps(pushSnap(ch.memorySnaps, {
@@ -3406,7 +4465,7 @@ async function runManualMemory(id, mode) {
 			}));
 		} else {
 			const start = c.memoryUntil || 0;
-			const text = await summarizeMemory(c, grok, c.messages.slice(start, needed), c.memory || "（无）", ctrl.signal);
+			const text = await summarizeMemory(c, grok, c.messages.slice(start, needed), c.memory || "（无）", ctrl.signal, delta);
 			patch(id, (ch) => ({
 				...ch,
 				...applySnaps(pushSnap(ch.memorySnaps, {
@@ -3425,8 +4484,9 @@ async function runManualMemory(id, mode) {
 		return true;
 	} catch (e) {
 		if (e.name === "AbortError") return false;
-		useApp.getState().toast("总结失败，旧备忘还在");
-		setMemoryHint(id, null);
+		const reason = memoryFailReason(e);
+		useApp.getState().toast(reason === "请求失败" ? "总结失败，旧备忘还在" : `总结失败：${reason}`);
+		setMemoryHint(id, "fail", { error: reason });
 		return false;
 	} finally {
 		if (memoryAborts.get(id) === ctrl) memoryAborts.delete(id);
@@ -3446,11 +4506,11 @@ async function editMessage(id, msgId, text) {
 			...ch,
 			messages: [...ch.messages.slice(0, idx), {
 				...msg,
-				content: text
+				content: text.trim()
 			}],
 			...applySnaps(rewindSnaps(ch.memorySnaps, idx))
 		}));
-		await runReply(id, text, false);
+		await runReply(id, text.trim(), false);
 	} else patch(id, (ch) => ({
 		...ch,
 		messages: ch.messages.map((m) => m.id === msgId ? {
@@ -3599,6 +4659,13 @@ function insertTag(text, caret, tag) {
 		caret: next.length
 	};
 }
+function firstChatImageBlob(chat) {
+	if (chat.avatarBlobId) return chat.avatarBlobId;
+	for (const m of chat.messages ?? []) {
+		const hit = m.images?.find((g) => g.status === "done" && g.blobId);
+		if (hit?.blobId) return hit.blobId;
+	}
+}
 function IconBtn({ className, children, ...rest }) {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
 		type: "button",
@@ -3746,23 +4813,26 @@ function ExpandSelect({ value, options, onChange, render, className, align = "ce
 		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
 			type: "button",
 			onClick: () => setOpen((v) => !v),
-			className: cn("inline-flex h-9 items-center gap-1 rounded-full px-3 text-[14px] font-medium text-ink", align === "center" ? "justify-center" : "w-full justify-between"),
+			className: cn("inline-flex h-9 items-center gap-1 rounded-full px-3 text-[14px] font-medium", current?.danger ? "text-danger" : "text-ink", align === "center" ? "justify-center" : "w-full justify-between"),
 			children: [render ? render(value, trigger) : trigger, /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChevronDown, { className: cn("size-4 text-muted transition", open && "rotate-180") })]
 		}), open && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 			className: cn("absolute top-[110%] z-50 min-w-[10rem] overflow-hidden rounded-[20px] border border-line bg-card py-1 shadow-[0_16px_40px_rgb(44_40_36/0.16)]", menuSide === "start" && "left-0", menuSide === "end" && "right-0", menuSide === "center" && (align === "left" ? "left-0 right-0 w-full" : "left-1/2 w-[min(280px,80vw)] -translate-x-1/2")),
 			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 				className: "max-h-[50vh] overflow-auto scroll-thin",
-				children: options.map((o) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+				children: options.map((o) => o.header ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "px-4 py-1.5 text-center text-[12px] font-medium text-good",
+					children: o.label
+				}, o.id) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
 					type: "button",
 					onClick: () => {
 						onChange(o.id);
 						setOpen(false);
 					},
-					className: cn("flex w-full items-center gap-2 px-4 py-3 text-left text-[14px]", o.id === value ? "bg-dim/70 font-medium" : "hover:bg-surface"),
+					className: cn("flex w-full items-center gap-2 px-4 py-3 text-left text-[14px]", o.danger && "text-danger", o.id === value ? "bg-dim/70 font-medium" : "hover:bg-surface"),
 					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
 						className: "min-w-0 flex-1 truncate",
 						children: o.label
-					}), o.id === value && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Check, { className: "size-4 shrink-0 text-primary" })]
+					}), o.id === value && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Check, { className: cn("size-4 shrink-0", o.danger ? "text-danger" : "text-primary") })]
 				}, o.id))
 			})
 		})]
@@ -3782,15 +4852,15 @@ function ToastHost() {
 function Modal({ open, onClose, title, children, wide, hideClose }) {
 	if (!open) return null;
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-		className: "fixed inset-0 z-[70] flex items-start justify-center px-5 pt-[12vh]",
+		className: "fixed inset-0 z-[70] flex items-start justify-center px-5 pt-[12vh] pb-[max(16px,env(safe-area-inset-bottom))]",
 		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
 			className: "absolute inset-0 bg-overlay",
 			onClick: onClose,
 			"aria-label": "关闭"
 		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-			className: cn("relative w-full overflow-auto rounded-[24px] bg-bg p-5 shadow-2xl", wide ? "max-w-lg" : "max-w-sm"),
+			className: cn("relative max-h-[calc(100dvh-12vh-16px-env(safe-area-inset-bottom))] w-full overflow-y-auto overscroll-contain rounded-[24px] bg-bg shadow-2xl scroll-thin", wide ? "max-w-lg" : "max-w-sm"),
 			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-				className: cn("mb-4 flex items-center", hideClose ? "" : "justify-between"),
+				className: cn("sticky top-0 z-10 flex items-center bg-bg px-5 pt-5 pb-4", hideClose ? "" : "justify-between"),
 				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
 					className: "text-[18px] font-semibold",
 					children: title
@@ -3799,7 +4869,10 @@ function Modal({ open, onClose, title, children, wide, hideClose }) {
 					className: "size-9",
 					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { className: "size-5" })
 				})]
-			}), children]
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "px-5 pb-5",
+				children
+			})]
 		})]
 	});
 }
@@ -3856,6 +4929,38 @@ function Avatar({ url, name, dim, size = 40 }) {
 		}) : ch
 	});
 }
+function useBlobUrl(id) {
+	const [url, setUrl] = (0, import_react.useState)(() => cachedUrl(id));
+	(0, import_react.useEffect)(() => {
+		let gone = false;
+		if (!id) {
+			setUrl(null);
+			return;
+		}
+		const hit = cachedUrl(id);
+		if (hit) {
+			setUrl(hit);
+			return;
+		}
+		setUrl(null);
+		imageUrl(id).then((u) => {
+			if (!gone) setUrl(u);
+		});
+		return () => {
+			gone = true;
+		};
+	}, [id]);
+	return url;
+}
+function ChatAvatar({ chat, name, size, dim }) {
+	const url = useBlobUrl(firstChatImageBlob(chat));
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Avatar, {
+		url,
+		name: name ?? chat.name,
+		size,
+		dim
+	});
+}
 function ChatModelSelect({ align = "center", className }) {
 	const source = useApp((s) => s.settings.chatSource);
 	const grok = useApp((s) => s.settings.grokModelId);
@@ -3888,7 +4993,7 @@ function ChatModelSelect({ align = "center", className }) {
 	}
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ExpandSelect, {
 		value: grok,
-		options: GROK_MODELS.map((m) => ({
+		options: GROK_MODELS$1.map((m) => ({
 			id: m.id,
 			label: m.label,
 			short: m.short
@@ -3902,10 +5007,11 @@ function ChatPane({ chat }) {
 	const left = useCooldown(useApp((s) => s.settings.cooldownUntil));
 	const chatImage = useApp((s) => s.settings.chatImage !== false);
 	const memoryHint = useApp((s) => s.ui.memoryHint);
+	const editUser = useApp((s) => s.ui.editUserMsg?.chatId === chat.id ? s.ui.editUserMsg : null);
 	const scroller = (0, import_react.useRef)(null);
 	const inputRef = (0, import_react.useRef)(null);
 	const [atBottom, setAtBottom] = (0, import_react.useState)(true);
-	const [draft, setDraft] = (0, import_react.useState)("");
+	const draft = useApp((s) => s.composerDrafts[chat.id] ?? "");
 	(0, import_react.useEffect)(() => {
 		const el = scroller.current;
 		if (!el) return;
@@ -3913,6 +5019,9 @@ function ChatPane({ chat }) {
 		const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
 		setAtBottom(bottom);
 	}, [chat.id]);
+	(0, import_react.useEffect)(() => {
+		if (editUser) requestAnimationFrame(() => inputRef.current?.focus());
+	}, [editUser?.msgId]);
 	const onScroll = () => {
 		const el = scroller.current;
 		if (!el) return;
@@ -3920,19 +5029,41 @@ function ChatPane({ chat }) {
 		setAtBottom(bottom);
 		useApp.getState().patchChat(chat.id, { scrollTop: el.scrollTop });
 	};
+	const startUserEdit = (msgId, content) => {
+		const backup = editUser ? editUser.backup : draft;
+		useApp.getState().setUI({ editUserMsg: {
+			chatId: chat.id,
+			msgId,
+			backup
+		} });
+		useApp.getState().setComposerDraft(chat.id, content);
+		requestAnimationFrame(() => inputRef.current?.focus());
+	};
+	const cancelUserEdit = () => {
+		if (!editUser) return;
+		useApp.getState().setComposerDraft(chat.id, editUser.backup);
+		useApp.getState().setUI({ editUserMsg: null });
+	};
 	const send = () => {
 		const t = draft;
-		setDraft("");
+		if (editUser) {
+			const { msgId, backup } = editUser;
+			useApp.getState().setUI({ editUserMsg: null });
+			useApp.getState().setComposerDraft(chat.id, backup);
+			editMessage(chat.id, msgId, t);
+			return;
+		}
+		useApp.getState().setComposerDraft(chat.id, "");
 		sendUser(chat.id, t);
 	};
 	const portrait = chat.imageParams.height >= chat.imageParams.width;
-	const lastAssistId = [...chat.messages].reverse().find((m) => m.role !== "user")?.id;
 	const { W, I } = foldWindow();
 	const memOk = memoryCaughtUp(chat.messages.length, chat.memoryUntil || 0, W, I);
 	const memMine = memoryHint?.chatId === chat.id;
 	const memGenerating = memMine && memoryHint?.state === "generating";
 	const memOkFlash = memMine && memoryHint?.state === "ok";
 	const memFail = !memOk && !memGenerating && !memOkFlash;
+	const failReason = memMine && memoryHint?.state === "fail" ? memoryHint.error : "";
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 		className: "flex h-full min-h-0 flex-col",
 		children: [
@@ -3995,11 +5126,12 @@ function ChatPane({ chat }) {
 				}), chat.messages.map((m) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Bubble, {
 					chat,
 					msg: m,
-					showImageTray: chatImage && lastAssistId === m.id,
+					showImageTray: chatImage && m.role !== "user",
 					onUseOption: (t) => {
-						setDraft(t);
+						useApp.getState().setComposerDraft(chat.id, t);
 						requestAnimationFrame(() => inputRef.current?.focus());
-					}
+					},
+					onEditUser: m.role === "user" ? () => startUserEdit(m.id, m.content) : void 0
 				}, m.id))]
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
@@ -4061,7 +5193,7 @@ function ChatPane({ chat }) {
 						className: "flex items-center gap-2 px-[52px] pb-1 text-[12px]",
 						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
 							className: memFail ? "min-w-0 flex-1 text-danger" : memOkFlash ? "min-w-0 flex-1 text-good" : "min-w-0 flex-1 text-faint",
-							children: memGenerating ? "生成记忆中" : memOkFlash ? "记忆已生成" : "记忆生成失败"
+							children: memGenerating ? "生成记忆中" : memOkFlash ? "记忆已生成" : failReason ? `记忆生成失败（${failReason}）` : "记忆生成失败"
 						}), memGenerating ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
 							type: "button",
 							className: "shrink-0 text-muted",
@@ -4097,7 +5229,7 @@ function ChatPane({ chat }) {
 							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("textarea", {
 								ref: inputRef,
 								value: draft,
-								onChange: (e) => setDraft(e.target.value),
+								onChange: (e) => useApp.getState().setComposerDraft(chat.id, e.target.value),
 								onKeyDown: (e) => {
 									if (e.key === "Enter" && !e.shiftKey) {
 										e.preventDefault();
@@ -4111,11 +5243,20 @@ function ChatPane({ chat }) {
 							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
 								onClick: send,
 								className: "grid size-11 shrink-0 place-items-center rounded-full bg-primary text-on-primary",
-								"aria-label": "发送",
+								"aria-label": editUser ? "保存" : "发送",
 								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowUp, { className: "size-5" })
 							})
 						]
-					})
+					}),
+					editUser ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "flex justify-center pt-1",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: "text-[12px] text-muted",
+							onClick: cancelUserEdit,
+							children: "取消编辑"
+						})
+					}) : null
 				]
 			})
 		]
@@ -4128,10 +5269,10 @@ function jumpParams(section) {
 function cnToggle(on) {
 	return on ? "px-1 font-medium text-ink" : "px-1 text-muted";
 }
-function Bubble({ chat, msg, showImageTray, onUseOption }) {
+function Bubble({ chat, msg, showImageTray, onUseOption, onEditUser }) {
 	const [edit, setEdit] = (0, import_react.useState)(false);
 	const [text, setText] = (0, import_react.useState)(msg.content);
-	const url = cachedUrl(chat.avatarBlobId);
+	const editRef = (0, import_react.useRef)(null);
 	const generating = msg.role !== "user" && !msg.content;
 	const names = [
 		msg.characterName,
@@ -4139,49 +5280,40 @@ function Bubble({ chat, msg, showImageTray, onUseOption }) {
 		...chat.characters.map((c) => c.name),
 		"角色"
 	];
+	const editingUser = useApp((s) => s.ui.editUserMsg?.msgId === msg.id);
+	const startAssistEdit = () => {
+		setText(msg.content);
+		setEdit(true);
+		requestAnimationFrame(() => editRef.current?.focus());
+	};
 	if (msg.role === "user") return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 		className: "mb-4 flex flex-col items-end",
-		children: [
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-				className: "w-fit max-w-[85%] rounded-[18px] border border-line bg-card px-4 py-2.5",
-				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-					className: "whitespace-pre-wrap text-[14px] leading-relaxed text-ink",
-					children: msg.content
-				})
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-				className: "mt-1.5 flex justify-end gap-1.5",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Mini, {
-					onClick: () => setEdit(true),
-					icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Pencil, { className: "size-3" }),
-					label: "编辑"
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Mini, {
-					onClick: () => void branchFrom(chat.id, msg.id),
-					icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(GitBranch, { className: "size-3" }),
-					label: "开分支"
-				})]
-			}),
-			edit && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-				className: "w-full max-w-[85%]",
-				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EditBox, {
-					text,
-					onChange: setText,
-					onCancel: () => setEdit(false),
-					onOk: () => {
-						editMessage(chat.id, msg.id, text);
-						setEdit(false);
-					}
-				})
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			className: cn("w-fit min-h-[2.75rem] min-w-[5.5rem] max-w-[85%] rounded-[18px] border px-4 py-2.5", editingUser ? "border-primary bg-card" : "border-line bg-card"),
+			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "whitespace-pre-wrap text-[14px] leading-relaxed text-ink",
+				children: msg.content
 			})
-		]
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "mt-1.5 flex justify-end gap-1.5",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Mini, {
+				onClick: () => onEditUser?.(),
+				icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Pencil, { className: "size-3" }),
+				label: "编辑"
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Mini, {
+				onClick: () => void branchFrom(chat.id, msg.id),
+				icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(GitBranch, { className: "size-3" }),
+				label: "开分支"
+			})]
+		})]
 	});
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 		className: "mb-6",
 		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
 			className: "mb-2 flex items-center gap-2",
 			onClick: () => useApp.getState().beginEdit(chat.id),
-			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Avatar, {
-				url,
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChatAvatar, {
+				chat,
 				name: msg.characterName || chat.name,
 				size: 36
 			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
@@ -4210,12 +5342,33 @@ function Bubble({ chat, msg, showImageTray, onUseOption }) {
 							})
 						]
 					})]
+				}) : edit ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("textarea", {
+					ref: editRef,
+					value: text,
+					onChange: (e) => setText(e.target.value),
+					className: "serif-body min-h-[120px] w-full resize-y bg-transparent text-[16px] leading-relaxed text-narrate outline-none"
 				}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ReplyView, {
 					text: msg.content,
 					names,
 					onUseOption
 				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				edit ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "mt-2 flex flex-wrap gap-1.5",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "inline-flex h-7 items-center rounded-full border border-line bg-card px-3 text-[12px] text-muted",
+						onClick: () => setEdit(false),
+						children: "取消"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "inline-flex h-7 items-center rounded-full bg-primary px-3 text-[12px] text-on-primary",
+						onClick: () => {
+							editMessage(chat.id, msg.id, text);
+							setEdit(false);
+						},
+						children: "保存"
+					})]
+				}) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 					className: "mt-2 flex flex-wrap gap-1.5",
 					children: [
 						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Mini, {
@@ -4228,21 +5381,12 @@ function Bubble({ chat, msg, showImageTray, onUseOption }) {
 							icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(GitBranch, { className: "size-3" }),
 							label: "开分支"
 						}),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Mini, {
-							onClick: () => setEdit(true),
+						!generating && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Mini, {
+							onClick: startAssistEdit,
 							icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Pencil, { className: "size-3" }),
 							label: "编辑"
 						})
 					]
-				}),
-				edit && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EditBox, {
-					text,
-					onChange: setText,
-					onCancel: () => setEdit(false),
-					onOk: () => {
-						editMessage(chat.id, msg.id, text);
-						setEdit(false);
-					}
 				}),
 				(msg.images.length > 0 || showImageTray && !generating) && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ImageBlock, {
 					chat,
@@ -4311,26 +5455,6 @@ function Mini({ icon, label, onClick }) {
 		children: [icon, label]
 	});
 }
-function EditBox({ text, onChange, onOk, onCancel }) {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-		className: "mt-2",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextArea, {
-			value: text,
-			onChange: (e) => onChange(e.target.value)
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-			className: "mt-2 flex gap-2",
-			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-				className: "rounded-full bg-primary px-4 py-1.5 text-[12px] text-on-primary",
-				onClick: onOk,
-				children: "保存"
-			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-				className: "px-3 text-[12px] text-muted",
-				onClick: onCancel,
-				children: "取消"
-			})]
-		})]
-	});
-}
 function ImageBlock({ chat, msg, allowEmpty }) {
 	const chatImage = useApp((s) => s.settings.chatImage !== false);
 	const done = msg.images.filter((g) => g.status === "done" && g.blobId);
@@ -4342,6 +5466,8 @@ function ImageBlock({ chat, msg, allowEmpty }) {
 	const [url, setUrl] = (0, import_react.useState)(null);
 	const [saved, setSaved] = (0, import_react.useState)(false);
 	const [kick, setKick] = (0, import_react.useState)(null);
+	const [flashErr, setFlashErr] = (0, import_react.useState)(null);
+	const seenFail = (0, import_react.useRef)("");
 	const current = done[idx] ?? done[done.length - 1];
 	const busy = kick ?? pendingImg?.source ?? null;
 	const locked = pending || Boolean(kick) || !chatImage;
@@ -4349,8 +5475,10 @@ function ImageBlock({ chat, msg, allowEmpty }) {
 		if (!pending) setKick(null);
 	}, [pending]);
 	(0, import_react.useEffect)(() => {
-		if (done.length > prevDone.current && followLatest.current) setIdx(done.length - 1);
-		else if (idx >= done.length && done.length > 0) setIdx(done.length - 1);
+		if (done.length > prevDone.current) {
+			setIdx(done.length - 1);
+			followLatest.current = true;
+		} else if (idx >= done.length && done.length > 0) setIdx(done.length - 1);
 		prevDone.current = done.length;
 	}, [done.length, idx]);
 	(0, import_react.useEffect)(() => {
@@ -4372,9 +5500,26 @@ function ImageBlock({ chat, msg, allowEmpty }) {
 			return next;
 		});
 	};
-	const lastError = [...msg.images].reverse().find((g) => g.status === "error");
+	const latest = msg.images.at(-1);
+	const lastError = latest?.status === "error" ? latest : void 0;
 	const phaseLabel = genPhaseLabel(pendingImg?.status) || (kick === "rewrite" || kick === "auto" ? "写提示词中" : kick ? "上传中" : "");
+	(0, import_react.useEffect)(() => {
+		if (pending || !lastError || !current?.blobId) {
+			if (!lastError) setFlashErr(null);
+			return;
+		}
+		if (seenFail.current === lastError.id) return;
+		seenFail.current = lastError.id;
+		setFlashErr(genPhaseLabel("error", lastError.error));
+		const t = window.setTimeout(() => setFlashErr(null), 2e3);
+		return () => window.clearTimeout(t);
+	}, [
+		pending,
+		lastError,
+		current?.blobId
+	]);
 	if (msg.images.length === 0 && !allowEmpty) return null;
+	const showFrame = msg.images.length > 0 || pending;
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 		className: "mt-3",
 		children: [
@@ -4415,7 +5560,7 @@ function ImageBlock({ chat, msg, allowEmpty }) {
 					})
 				]
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			showFrame ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 				className: "relative overflow-hidden rounded-[18px] bg-dim",
 				children: current && url ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 					className: "relative",
@@ -4423,7 +5568,7 @@ function ImageBlock({ chat, msg, allowEmpty }) {
 						src: url,
 						alt: "",
 						className: "w-full"
-					}), done.length > 1 && !pending && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					}), done.length > 1 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
 						className: "absolute inset-y-0 left-0 w-1/2",
 						onClick: () => go(-1),
 						"aria-label": "上一张"
@@ -4436,12 +5581,20 @@ function ImageBlock({ chat, msg, allowEmpty }) {
 					className: "grid place-items-center px-4 text-[13px] text-muted",
 					style: { aspectRatio: `${chat.imageParams.width} / ${chat.imageParams.height}` },
 					children: pending ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
-						className: "flex items-center gap-2",
-						children: [
-							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoaderCircle, { className: "size-4 animate-spin" }),
-							" ",
-							phaseLabel || "准备中"
-						]
+						className: "flex items-center gap-3",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+							className: "flex items-center gap-2",
+							children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoaderCircle, { className: "size-4 animate-spin" }),
+								" ",
+								phaseLabel || "准备中"
+							]
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: "text-primary",
+							onClick: () => cancelImage(chat.id, msg.id),
+							children: "取消"
+						})]
 					}) : lastError ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
 						className: "text-center text-danger",
 						children: genPhaseLabel("error", lastError.error)
@@ -4450,7 +5603,11 @@ function ImageBlock({ chat, msg, allowEmpty }) {
 						children: "还没有配图"
 					})
 				})
-			}),
+			}) : null,
+			flashErr ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "mt-1 truncate text-center text-[11px] leading-4 text-danger",
+				children: flashErr
+			}) : null,
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 				className: "mt-2 grid grid-cols-4 text-[12px] text-muted",
 				children: [
@@ -4460,6 +5617,10 @@ function ImageBlock({ chat, msg, allowEmpty }) {
 						busy: busy === "same",
 						disabled: locked || !current,
 						onClick: () => {
+							if (busy === "same") {
+								cancelImage(chat.id, msg.id);
+								return;
+							}
 							if (locked || !current) return;
 							setKick("same");
 							attachImage(chat.id, msg.id, "same");
@@ -4467,10 +5628,14 @@ function ImageBlock({ chat, msg, allowEmpty }) {
 					}),
 					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(IcoBtn, {
 						icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Sparkles, { className: "size-4" }),
-						label: busy === "rewrite" && phaseLabel ? phaseLabel : "换提示词生成",
-						busy: busy === "rewrite",
+						label: (busy === "rewrite" || busy === "auto") && phaseLabel ? phaseLabel : "换提示词生成",
+						busy: busy === "rewrite" || busy === "auto",
 						disabled: locked,
 						onClick: () => {
+							if (busy === "rewrite" || busy === "auto") {
+								cancelImage(chat.id, msg.id);
+								return;
+							}
 							if (locked) return;
 							setKick("rewrite");
 							attachImage(chat.id, msg.id, "rewrite");
@@ -4484,8 +5649,7 @@ function ImageBlock({ chat, msg, allowEmpty }) {
 							if (!current?.blobId) return;
 							const u = await imageUrl(current.blobId);
 							if (!u) return;
-							const blob = await fetch(u).then((r) => r.blob());
-							downloadBlob(blob, String(current.seed));
+							downloadBlob(await fetch(u).then((r) => r.blob()), String(current.seed));
 							setSaved(true);
 							setTimeout(() => setSaved(false), 1e3);
 						}
@@ -4494,15 +5658,16 @@ function ImageBlock({ chat, msg, allowEmpty }) {
 						icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(WandSparkles, { className: "size-4" }),
 						label: busy === "custom" && phaseLabel ? phaseLabel : "自定义修改",
 						busy: busy === "custom",
-						disabled: locked || !current,
+						disabled: !chatImage,
 						onClick: () => {
-							if (!current || locked) return;
+							const src = pendingImg && (pendingImg.prompt || pendingImg.charTails) ? pendingImg : current ?? pendingImg;
+							if (!src) return;
 							useApp.getState().setUI({ customPrompt: {
 								chatId: chat.id,
 								msgId: msg.id,
-								imgId: current.id,
-								text: extractGrokTail(current.prompt, chat.imageParams) || current.prompt,
-								charTails: { ...current.charTails || {} }
+								imgId: src.id,
+								text: extractGrokTail(src.prompt, chat.imageParams) || src.prompt || "",
+								charTails: { ...src.charTails || {} }
 							} });
 						}
 					})
@@ -4515,7 +5680,7 @@ function IcoBtn({ icon, label, onClick, busy, disabled }) {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
 		type: "button",
 		onClick,
-		disabled,
+		disabled: busy ? false : disabled,
 		"aria-busy": busy || void 0,
 		"aria-label": label,
 		className: busy ? "flex w-full min-w-0 flex-col items-center gap-1 px-1 py-1 text-center text-primary" : "flex w-full min-w-0 flex-col items-center gap-1 px-1 py-1 text-center disabled:opacity-40",
@@ -4529,12 +5694,24 @@ function CustomPromptModal() {
 	const data = useApp((s) => s.ui.customPrompt);
 	const setUI = useApp((s) => s.setUI);
 	const chat = useApp((s) => data ? s.chats.find((c) => c.id === data.chatId) : void 0);
+	const msg = chat?.messages.find((m) => m.id === data?.msgId);
+	const live = msg?.images.find((g) => g.id === data?.imgId);
+	const generating = msg?.images.some((g) => g.status !== "done" && g.status !== "error") ?? false;
 	const [text, setText] = (0, import_react.useState)(data?.text ?? "");
 	const [charTails, setCharTails] = (0, import_react.useState)(data?.charTails ?? {});
+	const edited = (0, import_react.useRef)(false);
 	(0, import_react.useEffect)(() => {
+		edited.current = false;
 		setText(data?.text ?? "");
 		setCharTails(data?.charTails ?? {});
 	}, [data?.text, data?.imgId]);
+	const liveKey = live ? `${live.id}\n${live.prompt}\n${JSON.stringify(live.charTails || {})}` : "";
+	(0, import_react.useEffect)(() => {
+		if (!chat || !live || edited.current) return;
+		if (!live.prompt && !live.charTails) return;
+		setText(extractGrokTail(live.prompt, chat.imageParams) || live.prompt || "");
+		setCharTails({ ...live.charTails || {} });
+	}, [liveKey]);
 	if (!data || !chat) return null;
 	const insert = chat.isMulti && chat.promptMode === "insert";
 	const chars = chat.imageParams.characters;
@@ -4542,58 +5719,85 @@ function CustomPromptModal() {
 		open: true,
 		onClose: () => setUI({ customPrompt: null }),
 		title: "自定义修改提示词",
-		children: [insert ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-				className: "mb-3 text-[12px] leading-5 text-muted",
-				children: "总提示追加到「正面提示词 · 中」后面，各角色追加到对应角色正面提示词后面。不会写入 ENABLED。"
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-				className: "mb-1 text-[13px] font-medium",
-				children: "总提示（正面提示词 · 中）"
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextArea, {
-				className: "min-h-[96px]",
-				value: text,
-				onChange: (e) => setText(e.target.value)
-			}),
-			chars.map((ch, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-				className: "mt-3",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		children: [
+			insert ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "mb-3 text-[12px] leading-5 text-muted",
+					children: "总提示追加到「正面提示词 · 中」后面，各角色追加到对应角色正面提示词后面。不会写入 ENABLED。"
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 					className: "mb-1 text-[13px] font-medium",
-					children: [
-						"角色",
-						i + 1,
-						ch.name ? `:${ch.name}` : "",
-						" 正面提示词"
-					]
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextArea, {
-					className: "min-h-[88px]",
-					value: charTails[ch.id] ?? "",
-					onChange: (e) => setCharTails((prev) => ({
-						...prev,
-						[ch.id]: e.target.value
-					}))
+					children: "总提示（正面提示词 · 中）"
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextArea, {
+					className: "min-h-[96px]",
+					value: text,
+					onChange: (e) => {
+						edited.current = true;
+						setText(e.target.value);
+					}
+				}),
+				chars.map((ch, i) => {
+					const name = (chat.characters.find((c) => c.id === ch.id)?.name || ch.name || "").trim();
+					return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "mt-3",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "mb-1 text-[13px] font-medium",
+							children: [
+								"角色",
+								i + 1,
+								name ? `:${name}` : "",
+								" 正面提示词"
+							]
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextArea, {
+							className: "min-h-[88px]",
+							value: charTails[ch.id] ?? "",
+							onChange: (e) => {
+								edited.current = true;
+								setCharTails((prev) => ({
+									...prev,
+									[ch.id]: e.target.value
+								}));
+							}
+						})]
+					}, ch.id);
+				})
+			] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextArea, {
+				className: "min-h-[160px]",
+				value: text,
+				onChange: (e) => {
+					edited.current = true;
+					setText(e.target.value);
+				}
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "mt-4 flex gap-2",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					className: "h-12 flex-1 rounded-full border border-line bg-card text-[15px] font-medium",
+					onClick: () => setUI({ customPrompt: null }),
+					children: "取消"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					disabled: generating,
+					className: "h-12 flex-[1.2] rounded-full bg-primary text-[15px] font-medium text-on-primary disabled:opacity-40",
+					onClick: () => {
+						if (generating) return;
+						attachImage(data.chatId, data.msgId, "custom", text, insert ? charTails : void 0);
+						setUI({ customPrompt: null });
+					},
+					children: "按这个生成"
 				})]
-			}, ch.id))
-		] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextArea, {
-			className: "min-h-[160px]",
-			value: text,
-			onChange: (e) => setText(e.target.value)
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-			className: "mt-4 flex gap-2",
-			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-				className: "h-12 flex-1 rounded-full border border-line bg-card text-[15px] font-medium",
-				onClick: () => setUI({ customPrompt: null }),
-				children: "取消"
-			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-				className: "h-12 flex-[1.2] rounded-full bg-primary text-[15px] font-medium text-on-primary",
+			}),
+			generating ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+				type: "button",
+				className: "mt-3 w-full text-center text-[13px] text-danger",
 				onClick: () => {
-					attachImage(data.chatId, data.msgId, "custom", text, insert ? charTails : void 0);
+					cancelImage(data.chatId, data.msgId);
 					setUI({ customPrompt: null });
 				},
-				children: "按这个生成"
-			})]
-		})]
+				children: "取消这次生图"
+			}) : null
+		]
 	});
 }
 function ConnectionPanel() {
@@ -4673,7 +5877,9 @@ function ConnectionPanel() {
 					className: "flex items-center gap-1.5 text-[13px] text-muted",
 					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Switch, {
 						on: settings.chatImage !== false,
-						onChange: (v) => useApp.getState().setSettings({ chatImage: v }),
+						onChange: (v) => {
+							useApp.getState().setSettings({ chatImage: v });
+						},
 						label: "生图"
 					}), "生图"]
 				}),
@@ -5033,8 +6239,7 @@ function ApiSettingsSheet({ onClose }) {
 					useApp.getState().setSettings(applyLlmPick(settings, id));
 				},
 				onStar: (id) => {
-					const next = settings.llmStarred.includes(id) ? settings.llmStarred.filter((x) => x !== id) : [...settings.llmStarred, id];
-					const llmStarred = pruneStarred(next, settings.llmModels, settings.llmModel);
+					const llmStarred = pruneStarred(settings.llmStarred.includes(id) ? settings.llmStarred.filter((x) => x !== id) : [...settings.llmStarred, id], settings.llmModels, settings.llmModel);
 					useApp.getState().setSettings({
 						llmStarred,
 						llmAccounts: snapshotLlmAccount(settings.llmAccounts ?? [], settings.llmBase, settings.llmKey, llmStarred, settings.llmModel)
@@ -6597,36 +7802,39 @@ function ParamsPane({ chat, mode = "chat" }) {
 							children: "自定义位置"
 						})]
 					}),
-					p.characters.map((ch, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CharCard, {
-						ch,
-						index: i,
-						chatName: chat.name,
-						suggest: p.tagSuggest,
-						useCoords: p.useCoords,
-						onChange: (next) => patch({ characters: p.characters.map((x) => x.id === ch.id ? next : x) }),
-						onPick: (a) => pickAppearance(ch.id, a),
-						onApplyLook: mode === "chat" ? () => {
-							const role = chat.characters.find((c) => c.id === ch.id) ?? chat.characters[i];
-							if (!role) {
-								useApp.getState().toast("没有对应人设");
-								return;
-							}
-							useApp.getState().patchChat(chat.id, (c) => ({
-								...c,
-								characters: c.characters.map((x) => x.id === role.id ? {
-									...x,
-									appearance: ch.prompt
-								} : x)
-							}));
-							useApp.getState().toast("已写入外貌备忘");
-						} : void 0,
-						onRemove: p.characters.length > 1 ? () => useApp.getState().setUI({ confirm: {
-							title: "删除角色",
-							body: `删除「${ch.name || `角色${i + 1}`}」的提示词栏？`,
-							danger: true,
-							onOk: () => patch({ characters: p.characters.filter((x) => x.id !== ch.id) })
-						} }) : void 0
-					}, ch.id)),
+					p.characters.map((ch, i) => {
+						const role = chat.characters.find((c) => c.id === ch.id) ?? chat.characters[i];
+						return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CharCard, {
+							ch,
+							index: i,
+							name: (role?.name || ch.name || "").trim(),
+							suggest: p.tagSuggest,
+							useCoords: p.useCoords,
+							onChange: (next) => patch({ characters: p.characters.map((x) => x.id === ch.id ? next : x) }),
+							onPick: (a) => pickAppearance(ch.id, a),
+							onApplyLook: mode === "chat" ? () => {
+								const role = chat.characters.find((c) => c.id === ch.id) ?? chat.characters[i];
+								if (!role) {
+									useApp.getState().toast("没有对应人设");
+									return;
+								}
+								useApp.getState().patchChat(chat.id, (c) => ({
+									...c,
+									characters: c.characters.map((x) => x.id === role.id ? {
+										...x,
+										appearance: ch.prompt
+									} : x)
+								}));
+								useApp.getState().toast("已写入外貌备忘");
+							} : void 0,
+							onRemove: () => useApp.getState().setUI({ confirm: {
+								title: "删除角色",
+								body: `删除「${ch.name || `角色${i + 1}`}」的提示词栏？`,
+								danger: true,
+								onOk: () => patch({ characters: p.characters.filter((x) => x.id !== ch.id) })
+							} })
+						}, ch.id);
+					}),
 					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
 						type: "button",
 						className: "mt-1 flex items-center gap-1 px-2 py-2 text-[13px] text-primary",
@@ -6646,8 +7854,8 @@ function ParamsPane({ chat, mode = "chat" }) {
 		]
 	});
 }
-function CharCard({ ch, index, chatName, suggest, useCoords, onChange, onPick, onApplyLook, onRemove }) {
-	const title = `角色${index + 1}:${ch.name || chatName || ""}`;
+function CharCard({ ch, index, name, suggest, useCoords, onChange, onPick, onApplyLook, onRemove }) {
+	const title = name ? `角色${index + 1}:${name}` : `角色${index + 1}`;
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Card, {
 		className: "mb-3 overflow-visible",
 		children: [
@@ -6760,17 +7968,18 @@ function ImageAiPicker() {
 	const llmModel = useApp((s) => s.settings.llmModel);
 	const starred = useApp((s) => s.settings.llmStarred);
 	const available = useApp((s) => s.settings.llmModels);
+	const connected = useApp((s) => s.settings.llmConnected);
 	const imageModelId = useApp((s) => s.settings.imageModelId);
-	const imageModelPin = useApp((s) => s.settings.imageModelPin);
-	const ids = imagePickerModels({
+	const rows = imagePickerModels({
 		chatSource: source,
 		llmStarred: starred,
 		llmModels: available,
 		llmModel,
-		imageModelId,
-		imageModelPin
+		llmConnected: connected,
+		imageModelId
 	});
-	const value = imageModelId || "__follow__";
+	const ids = rows.filter((r) => !r.header).map((r) => r.id);
+	const value = imageModelId && ids.includes(imageModelId) ? imageModelId : FOLLOW_IMAGE_AI;
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 		className: "shrink-0 pt-1 text-right",
 		children: [
@@ -6781,13 +7990,16 @@ function ImageAiPicker() {
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 				className: "mt-1 inline-flex rounded-full border border-line bg-card",
 				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ExpandSelect, {
-					value: ids.includes(value) ? value : FOLLOW_IMAGE_AI,
-					options: ids.map((id) => ({
-						id,
-						label: imageAiLabel(id),
-						short: imageAiLabel(id)
+					value,
+					options: rows.map((r) => ({
+						id: r.id,
+						label: r.header ?? imageAiLabel(r.id),
+						short: r.header ?? imageAiLabel(r.id),
+						header: Boolean(r.header),
+						danger: r.danger
 					})),
 					onChange: (id) => {
+						if (id.startsWith("__hdr_")) return;
 						const s = useApp.getState().settings;
 						useApp.getState().setSettings(applyImageAiPick(s, id));
 					},
@@ -6851,8 +8063,11 @@ function PreviewParamsDrawer({ currentId, onPeek, onApply }) {
 						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 							className: "min-w-0 flex-1",
 							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-								className: "flex items-center gap-1 truncate text-[14px] font-medium",
-								children: [f.starred && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Star, { className: "size-3 fill-primary text-primary" }), f.name || "文件夹"]
+								className: "flex min-w-0 items-center gap-1 text-[14px] font-medium",
+								children: [f.starred && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Star, { className: "size-3 shrink-0 fill-primary text-primary" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: "min-w-0 truncate",
+									children: f.name || "文件夹"
+								})]
 							}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 								className: "text-[12px] text-muted",
 								children: [inFolder(f.id).length, " 项"]
@@ -6869,15 +8084,17 @@ function PreviewParamsDrawer({ currentId, onPeek, onApply }) {
 							type: "button",
 							className: "flex min-w-0 flex-1 items-center gap-3 text-left",
 							onClick: () => peekChat(c),
-							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Avatar, {
-								url: cachedUrl(c.avatarBlobId),
-								name: c.name,
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChatAvatar, {
+								chat: c,
 								size: 40
 							}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 								className: "min-w-0 flex-1",
 								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-									className: "flex items-center gap-1 truncate text-[14px] font-medium",
-									children: [c.starred && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Star, { className: "size-3 fill-primary text-primary" }), c.name || "未命名"]
+									className: "flex min-w-0 items-center gap-1 text-[14px] font-medium",
+									children: [c.starred && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Star, { className: "size-3 shrink-0 fill-primary text-primary" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+										className: "min-w-0 truncate",
+										children: c.name || "未命名"
+									})]
 								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 									className: "truncate text-[12px] text-muted",
 									children: chatSnippet(c)
@@ -7069,6 +8286,10 @@ function parseNaiPng(buf) {
 }
 var HOLD_MS$1 = 400;
 var drawing = false;
+var drawAbort = null;
+function cancelPureDraw() {
+	drawAbort?.abort();
+}
 function PurePane() {
 	const history = useApp((s) => s.history);
 	const left = useCooldown(useApp((s) => s.settings).cooldownUntil);
@@ -7080,11 +8301,13 @@ function PurePane() {
 	const [flipLock, setFlipLock] = (0, import_react.useState)(false);
 	const followLatest = (0, import_react.useRef)(true);
 	const prevDone = (0, import_react.useRef)(0);
-	const done = history.filter((h) => h.status === "done" && h.blobId);
+	const done = sortHistoryNewestFirst(history.filter((h) => h.status === "done" && h.blobId));
 	const item = done[idx] ?? done[0];
 	(0, import_react.useEffect)(() => {
-		if (done.length > prevDone.current && followLatest.current) setIdx(0);
-		else if (idx >= done.length && done.length > 0) setIdx(0);
+		if (done.length > prevDone.current) {
+			setIdx(0);
+			followLatest.current = true;
+		} else if (idx >= done.length && done.length > 0) setIdx(0);
 		prevDone.current = done.length;
 	}, [done.length, idx]);
 	(0, import_react.useEffect)(() => {
@@ -7213,10 +8436,13 @@ function PurePane() {
 						className: "flex-1",
 						busy: Boolean(phase),
 						onClick: () => {
-							if (phase) return;
+							if (phase) {
+								cancelPureDraw();
+								return;
+							}
 							drawOne(setPhase);
 						},
-						children: phase ? genPhaseLabel(phase) : "绘一张"
+						children: phase ? "取消" : "绘一张"
 					}),
 					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(IconBtn, {
 						className: "text-on-stage",
@@ -7244,6 +8470,7 @@ function PurePane() {
 			}),
 			sheet === "hist" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(HistSheet, {
 				items: done,
+				activeId: item?.id,
 				onClose: closeSheet,
 				onPreview: (i) => {
 					followLatest.current = i === 0;
@@ -7283,7 +8510,7 @@ function Sheet({ title, onClose, extra, children }) {
 	});
 }
 function FavSheet({ currentBlob, onClose }) {
-	const favorites = useApp((s) => s.favorites);
+	const favorites = sortHistoryNewestFirst(useApp((s) => s.favorites));
 	const [openId, setOpenId] = (0, import_react.useState)(null);
 	const current = favorites.find((f) => f.id === openId);
 	if (current) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FavDetail, {
@@ -7476,7 +8703,7 @@ function RatioThumb({ blobId, w, h }) {
 		}) : null
 	});
 }
-function HistSheet({ items, onClose, onPreview }) {
+function HistSheet({ items, activeId, onClose, onPreview }) {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Sheet, {
 		title: "历史",
 		onClose,
@@ -7484,6 +8711,7 @@ function HistSheet({ items, onClose, onPreview }) {
 			className: "grid grid-cols-3 gap-2",
 			children: [items.map((h, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(HistCell, {
 				item: h,
+				active: h.id === activeId,
 				onPreview: () => onPreview(i)
 			}, h.id)), items.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 				className: "col-span-3 py-10 text-center text-[13px] text-muted",
@@ -7492,7 +8720,7 @@ function HistSheet({ items, onClose, onPreview }) {
 		})
 	});
 }
-function HistCell({ item, onPreview }) {
+function HistCell({ item, active, onPreview }) {
 	const [u, setU] = (0, import_react.useState)(null);
 	const hold = (0, import_react.useRef)(null);
 	const held = (0, import_react.useRef)(false);
@@ -7508,17 +8736,18 @@ function HistCell({ item, onPreview }) {
 		clear();
 		hold.current = window.setTimeout(() => {
 			held.current = true;
-			useApp.getState().deleteHistory(item.id);
 		}, HOLD_MS$1);
 		e.currentTarget.setPointerCapture(e.pointerId);
 	};
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-		className: "relative overflow-hidden rounded-[8px] bg-dim",
+		className: active ? "relative overflow-hidden rounded-[8px] bg-dim ring-2 ring-red-500 ring-offset-1 ring-offset-bg" : "relative overflow-hidden rounded-[8px] bg-dim",
 		onPointerDown: onDown,
-		onPointerUp: () => {
+		onPointerUp: (e) => {
 			const was = held.current;
 			clear();
-			if (!was) onPreview();
+			e.stopPropagation();
+			if (was) useApp.getState().deleteHistory(item.id);
+			else onPreview();
 		},
 		onPointerCancel: clear,
 		onContextMenu: (e) => e.preventDefault(),
@@ -7660,6 +8889,8 @@ async function drawOne(setPhase) {
 	}
 	if (drawing) return;
 	drawing = true;
+	const ac = new AbortController();
+	drawAbort = ac;
 	const seed = params.seedLocked && params.seed != null ? params.seed : randomSeed();
 	setPhase("uploading");
 	await afterPaint();
@@ -7670,6 +8901,7 @@ async function drawOne(setPhase) {
 			seed,
 			apiKey: settings.naiKey,
 			baseUrl: settings.naiBase,
+			signal: ac.signal,
 			onStart: () => setPhase("generating"),
 			onReceiving: () => {
 				useApp.getState().setCooldown(Date.now() + COOLDOWN_MS);
@@ -7693,8 +8925,9 @@ async function drawOne(setPhase) {
 		};
 		useApp.getState().addHistory(rec);
 	} catch (e) {
-		useApp.getState().toast(e instanceof Error ? e.message : "生图失败");
+		useApp.getState().toast(imageFailText(e, ac.signal));
 	} finally {
+		if (drawAbort === ac) drawAbort = null;
 		drawing = false;
 		setPhase(null);
 	}
@@ -7716,6 +8949,9 @@ function RoleEditor({ chat, mode }) {
 	const { W, I } = foldWindow();
 	const memOk = memoryCaughtUp(chat.messages.length, chat.memoryUntil || 0, W, I);
 	const memReady = foldCoveredEnd(chat.messages.length, W, I) >= 2;
+	const memoryHint = useApp((s) => s.ui.memoryHint);
+	const memStreaming = memoryHint?.chatId === chat.id && memoryHint.state === "generating";
+	const memoryShown = memStreaming && memoryHint.draft != null ? memoryHint.draft : chat.memory;
 	const fieldBusyLabel = busy?.kind === "field" ? FIELD_LABELS[busy.key] || busy.key : "";
 	const syncChars = (characters, isMulti = chat.isMulti) => patch({
 		characters,
@@ -7755,7 +8991,15 @@ function RoleEditor({ chat, mode }) {
 			charId
 		});
 		try {
-			const text = await polishField(useApp.getState().chats.find((c) => c.id === chat.id) ?? chat, grok, key, instruction, charId);
+			const snapshot = useApp.getState().chats.find((c) => c.id === chat.id) ?? chat;
+			const text = await polishField(snapshot, grok, key, instruction, charId, (t) => {
+				if (key !== "persona") return;
+				if (!snapshot.characters.find((c) => c.id === charId)?.personaVoices) return;
+				useApp.getState().patchChat(chat.id, (c) => ({
+					...applyRoleField(c, key, t, charId),
+					updatedAt: Date.now()
+				}));
+			});
 			useApp.getState().patchChat(chat.id, (c) => ({
 				...applyRoleField(c, key, text, charId),
 				updatedAt: Date.now()
@@ -7797,7 +9041,7 @@ function RoleEditor({ chat, mode }) {
 		}));
 		useApp.getState().commitChat(chat.id);
 		if (mode === "create") {
-			const { sendOpening } = await import("./chat-actions-Cs4lEO-w.mjs");
+			const { sendOpening } = await import("./chat-actions-xXtSMv4d.mjs");
 			sendOpening(chat.id);
 		} else useApp.getState().toast("设定已保存");
 	};
@@ -7809,10 +9053,24 @@ function RoleEditor({ chat, mode }) {
 		single: true,
 		busy: busy?.kind === "field" && busy.key === "name" && busy.charId === char.id,
 		locked,
-		onChange: (v) => patch({ characters: chat.characters.map((c) => c.id === char.id ? {
-			...c,
-			name: v
-		} : c) }),
+		onChange: (v) => useApp.getState().patchChat(chat.id, (c) => {
+			const characters = c.characters.map((x) => x.id === char.id ? {
+				...x,
+				name: v
+			} : x);
+			return {
+				...c,
+				characters,
+				imageParams: {
+					...c.imageParams,
+					characters: c.imageParams.characters.map((slot) => slot.id === char.id ? {
+						...slot,
+						name: v
+					} : slot)
+				},
+				updatedAt: Date.now()
+			};
+		}),
 		onRegen: () => runField("name", char.id),
 		onPersonal: () => openPersonalize("name", char.id)
 	}) : null;
@@ -7946,6 +9204,17 @@ function RoleEditor({ chat, mode }) {
 						placeholder: PLACEHOLDERS.persona,
 						busy: busy?.kind === "field" && busy.key === "persona" && busy.charId === char.id,
 						locked,
+						grow: Boolean(char.personaVoices),
+						titleExtra: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: `rounded-full border px-2 py-0.5 text-[11px] leading-none transition ${char.personaVoices ? "border-primary bg-primary text-on-primary" : "border-primary bg-transparent text-primary"}`,
+							disabled: locked,
+							onClick: () => patch({ characters: chat.characters.map((c) => c.id === char.id ? {
+								...c,
+								personaVoices: !c.personaVoices
+							} : c) }),
+							children: "声部"
+						}),
 						onChange: (v) => patch({ characters: chat.characters.map((c) => c.id === char.id ? {
 							...c,
 							persona: v
@@ -8047,9 +9316,10 @@ function RoleEditor({ chat, mode }) {
 					}),
 					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextArea, {
 						className: "min-h-[120px]",
-						value: chat.memory,
-						placeholder: "还没有长期记忆。对话变长后会自动整理。",
+						value: memoryShown,
+						placeholder: memStreaming ? "正在总结…" : "还没有长期记忆。对话变长后会自动整理。",
 						onChange: (e) => {
+							if (memStreaming) return;
 							const text = e.target.value;
 							const snaps = chat.memorySnaps ?? [];
 							const last = snaps[snaps.length - 1];
@@ -8211,7 +9481,7 @@ function RoleEditor({ chat, mode }) {
 		]
 	});
 }
-function FieldBlock({ label, hint, value, placeholder, onChange, onRegen, onPersonal, busy, locked, single }) {
+function FieldBlock({ label, hint, value, placeholder, onChange, onRegen, onPersonal, busy, locked, single, titleExtra, grow }) {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Card, {
 		className: "mb-3",
 		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(FieldLabel, {
@@ -8232,7 +9502,10 @@ function FieldBlock({ label, hint, value, placeholder, onChange, onRegen, onPers
 					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Sparkles, { className: "size-4 text-muted" })
 				})]
 			}),
-			children: label
+			children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+				className: "inline-flex items-center gap-1.5",
+				children: [label, titleExtra]
+			})
 		}), single ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextInput, {
 			value,
 			placeholder,
@@ -8240,8 +9513,8 @@ function FieldBlock({ label, hint, value, placeholder, onChange, onRegen, onPers
 		}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextArea, {
 			value,
 			placeholder,
-			rows: 5,
-			className: "min-h-[calc(1.5rem+5*1.625em)]",
+			rows: grow ? 12 : 5,
+			className: grow ? "min-h-[calc(1.5rem+12*1.625em)]" : "min-h-[calc(1.5rem+5*1.625em)]",
 			onChange: (e) => onChange(e.target.value)
 		})]
 	});
@@ -8252,14 +9525,37 @@ function Extras({ extras, onChange }) {
 		children: [extras.map((e, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Card, {
 			className: "mb-2",
 			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-				className: "mb-1 flex items-center justify-between",
+				className: "mb-1 flex items-center justify-between gap-2",
 				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 					className: "text-[13px] font-medium",
 					children: ["新增", i + 1]
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-					className: "text-danger",
-					onClick: () => onChange(extras.filter((x) => x.id !== e.id)),
-					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Trash2, { className: "size-4" })
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "flex items-center gap-2",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: `rounded-full border px-2 py-0.5 text-[11px] leading-none transition ${e.emphasize ? "border-primary bg-primary text-on-primary" : "border-primary bg-transparent text-primary"}`,
+							onClick: () => onChange(extras.map((x) => x.id === e.id ? {
+								...x,
+								emphasize: !x.emphasize
+							} : x)),
+							children: "强调"
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: `rounded-full border px-2 py-0.5 text-[11px] leading-none transition ${e.applyImage ? "border-primary bg-primary text-on-primary" : "border-primary bg-transparent text-primary"}`,
+							onClick: () => onChange(extras.map((x) => x.id === e.id ? {
+								...x,
+								applyImage: !x.applyImage
+							} : x)),
+							children: "应用到生图"
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							className: "text-danger",
+							onClick: () => onChange(extras.filter((x) => x.id !== e.id)),
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Trash2, { className: "size-4" })
+						})
+					]
 				})]
 			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextArea, {
 				value: e.body,
@@ -8681,8 +9977,11 @@ function FolderRow({ id, name, starred, collapsed, count, children, dragging, dr
 				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 					className: "min-w-0 flex-1",
 					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-						className: "flex items-center gap-1 truncate text-[15px] font-medium",
-						children: [starred && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Star, { className: "size-3 fill-primary text-primary" }), name]
+						className: "flex min-w-0 items-center gap-1 text-[15px] font-medium",
+						children: [starred && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Star, { className: "size-3 shrink-0 fill-primary text-primary" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "min-w-0 truncate",
+							children: name
+						})]
 					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 						className: "text-[12px] text-muted",
 						children: [count, " 项"]
@@ -8712,7 +10011,6 @@ function ChatRow({ id, active, nested, dragging, dragGroup, onGripDown }) {
 	const selected = ui.selected.includes(id);
 	const lastMsg = [...chat.messages].reverse().find((m) => m.content);
 	const last = chat.remark || (lastMsg && lastMsg.role !== "user" ? replyStoryText(lastMsg.content) || lastMsg.content : lastMsg?.content) || chat.opening;
-	const url = cachedUrl(chat.avatarBlobId);
 	const menu = ui.menuId === id;
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 		className: cn("relative mb-0.5", nested && "ml-3"),
@@ -8735,16 +10033,18 @@ function ChatRow({ id, active, nested, dragging, dragGroup, onGripDown }) {
 			},
 			className: cn("flex items-center gap-3 rounded-[18px] px-2 py-2 hold-none", active && !ui.selectMode && "bg-dim/70", selected && "bg-dim", dragging && "drag-dim"),
 			children: [
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Avatar, {
-					url,
-					name: chat.name,
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChatAvatar, {
+					chat,
 					dim: active && !ui.selectMode
 				}),
 				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 					className: "min-w-0 flex-1",
 					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-						className: "flex items-center gap-1 truncate text-[15px] font-medium",
-						children: [chat.starred && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Star, { className: "size-3 fill-primary text-primary" }), chat.name || "未命名"]
+						className: "flex min-w-0 items-center gap-1 text-[15px] font-medium",
+						children: [chat.starred && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Star, { className: "size-3 shrink-0 fill-primary text-primary" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "min-w-0 truncate",
+							children: chat.name || "未命名"
+						})]
 					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 						className: "truncate text-[12px] text-muted",
 						children: last || "新的对话"
@@ -8890,6 +10190,7 @@ function Shell() {
 	const theme = useApp((s) => s.settings.theme);
 	(0, import_react.useEffect)(() => {
 		document.documentElement.classList.toggle("dark", theme === "dark");
+		document.querySelector("meta[name=\"theme-color\"]")?.setAttribute("content", theme === "dark" ? "#1a1714" : "#F3EEE6");
 	}, [theme]);
 	let body;
 	if (tab === "pure") body = /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PurePane, {});
@@ -9103,7 +10404,9 @@ function FieldEditModal() {
 function MoveModal() {
 	const open = useApp((s) => s.ui.moveOpen);
 	const folders = useApp((s) => s.folders);
+	const chats = useApp((s) => s.chats);
 	if (!open) return null;
+	const { foldersSorted } = listedChats(folders, chats);
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Modal, {
 		open: true,
 		onClose: () => useApp.getState().setUI({ moveOpen: false }),
@@ -9112,7 +10415,7 @@ function MoveModal() {
 			className: "mb-2 w-full rounded-2xl bg-card px-4 py-3 text-left",
 			onClick: () => useApp.getState().moveSelected(null),
 			children: "不放进文件夹"
-		}), folders.map((f) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+		}), foldersSorted.map((f) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
 			className: "mb-2 w-full rounded-2xl bg-card px-4 py-3 text-left",
 			onClick: () => useApp.getState().moveSelected(f.id),
 			children: f.name
@@ -9261,7 +10564,7 @@ function MultiCreateModal() {
 					const draft = makeDraft();
 					pushDraft(draft);
 					useApp.getState().commitChat(draft.id);
-					const { sendOpening } = await import("./chat-actions-Cs4lEO-w.mjs");
+					const { sendOpening } = await import("./chat-actions-xXtSMv4d.mjs");
 					sendOpening(draft.id);
 				},
 				children: "跳过，开始聊天"
@@ -9271,9 +10574,9 @@ function MultiCreateModal() {
 }
 function Home() {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-		className: "h-[100dvh] overflow-hidden",
+		className: "h-[100dvh] overflow-hidden bg-bg",
 		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(App, {})
 	});
 }
 //#endregion
-export { editMessage as a, retryMemory as c, Home as component, sendUser as d, routes_h7rF3gxm_exports as f, cancelMemory as i, runManualMemory as l, attachImage as n, invalidateMemory as o, branchFrom as r, regenMessage as s, abortChat as t, sendOpening as u };
+export { imageWriteFields as A, randomSeed as B, defaultSettings as C, imageAiLabel as D, idb_exports as E, nearestScroller as F, snapshotLlmAccount as G, resolveImageWrite as H, parseChatCompletionPreset as I, uniqueNumberedName as J, sortHistoryNewestFirst as K, presetStyle as L, llmIdentity as M, loadAll as N, imagePickerModels as O, moveId as P, pruneStarred as R, db as S, downloadBlob as T, restoreSampler as U, rememberUrl as V, samplerPatch as W, uniquePresetName as Y, applyLlmPick as _, cancelMemory as a, chatPickerModels as b, regenMessage as c, Home as component, sendOpening as d, sendUser as f, applyImageAiPick as g, activePreset as h, cancelImage as i, indexFromY as j, imageUrl as k, retryMemory as l, FOLLOW_IMAGE_AI as m, attachImage as n, editMessage as o, routes_DGEvAUKS_exports as p, uid as q, branchFrom as r, invalidateMemory as s, abortChat as t, runManualMemory as u, autoScrollNearEdge as v, deleteImage as w, cn as x, cachedUrl as y, putImage as z };

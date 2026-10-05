@@ -431,7 +431,7 @@ export function ParamsPane({ chat, mode = "chat" }: { chat: Chat; mode?: "chat" 
               key={ch.id}
               ch={ch}
               index={i}
-              name={(role?.name || ch.name || "").trim()}
+              name={mode === "pure" ? "" : (role?.name || ch.name || "").trim()}
               suggest={p.tagSuggest}
               useCoords={p.useCoords}
               onChange={(next) => patch({ characters: p.characters.map((x) => (x.id === ch.id ? next : x)) })}

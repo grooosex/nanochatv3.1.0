@@ -1,0 +1,241 @@
+import type { ImageParams, Role } from "./types";
+import { cloneImageParams, joinPrompt, randomSeed } from "./defaults";
+import { isMultiDraft } from "./cast";
+import { flattenGrokPrompt, parseImageDirective, presenceFromDirective, stripDirectiveLabels } from "./parse-reply";
+
+function varietySigma(model: string): number {
+  if (model.includes("5-")) return 58;
+  if (model.includes("4-5")) return 19;
+  if (model.includes("4-")) return 19;
+  return 19;
+}
+
+export function resolveSeed(params: ImageParams, forceNew = false): number {
+  const raw = params.seed == null ? "" : String(params.seed).trim();
+  const n = raw ? Number(raw) : NaN;
+  const pinned = raw && Number.isFinite(n) ? Math.trunc(n) : null;
+  // 锁定优先：重新生成 / 纯生图的 forceNew 也不能换种子。
+  if (params.seedLocked && pinned != null) return pinned;
+  if (!forceNew && pinned != null) return pinned;
+  return randomSeed();
+}
+
+function clampSteps(model: string, steps: number, width: number, height: number): number {
+  const area = width * height;
+  const large = area > 1_048_576;
+  const max = large ? 50 : /nai-diffusion-5/.test(model) ? 23 : 28;
+  return Math.max(1, Math.min(steps, max));
+}
+
+export function buildNaiBody(opts: {
+  params: ImageParams;
+  positive: string;
+  seed: number;
+}) {
+  const { params, positive, seed } = opts;
+  const isV4Plus = /nai-diffusion-4|nai-diffusion-5/.test(params.model);
+  const chars = params.characters.filter((c) => c.enabled && c.prompt.trim());
+  const charPrompts = chars.map((c) => ({
+    prompt: c.prompt.trim(),
+    uc: c.uc.trim(),
+    center: { x: c.x, y: c.y },
+    enabled: true,
+  }));
+  const charCaptions = chars.map((c) => ({
+    char_caption: c.prompt.trim(),
+    centers: [{ x: c.x, y: c.y }],
+  }));
+  const charUcCaptions = chars.map((c) => ({
+    char_caption: c.uc.trim(),
+    centers: [{ x: c.x, y: c.y }],
+  }));
+  const steps = clampSteps(params.model, params.steps, params.width, params.height);
+
+  const parameters: Record<string, unknown> = {
+    params_version: 3,
+    width: params.width,
+    height: params.height,
+    scale: params.cfg,
+    sampler: params.sampler,
+    steps,
+    n_samples: 1,
+    ucPreset: params.ucPreset === "heavy" ? 0 : params.ucPreset === "light" ? 1 : params.ucPreset === "human" ? 2 : 3,
+    qualityToggle: false,
+    autoSmea: false,
+    dynamic_thresholding: params.decrisper,
+    controlnet_strength: 1,
+    legacy: false,
+    add_original_image: true,
+    cfg_rescale: params.cfgRescale,
+    noise_schedule: params.noiseSchedule,
+    legacy_v3_extend: false,
+    skip_cfg_above_sigma: params.varietyPlus ? varietySigma(params.model) : null,
+    use_coords: params.useCoords,
+    legacy_uc: false,
+    normalize_prompt: false,
+    seed,
+    extra_noise_seed: seed,
+    negative_prompt: params.negative,
+  };
+
+  if (isV4Plus) {
+    parameters.characterPrompts = charPrompts;
+    parameters.v4_prompt = {
+      caption: { base_caption: positive, char_captions: charCaptions },
+      use_coords: params.useCoords,
+      use_order: true,
+    };
+    parameters.v4_negative_prompt = {
+      caption: { base_caption: params.negative, char_captions: charUcCaptions },
+      legacy_uc: false,
+    };
+  }
+
+  return {
+    input: positive,
+    model: params.model,
+    action: "generate",
+    parameters,
+  };
+}
+
+export function buildIdlecloudBody(opts: {
+  params: ImageParams;
+  positive: string;
+  seed: number;
+}) {
+  const { params, positive, seed } = opts;
+  const chars = params.characters.filter((c) => c.enabled && c.prompt.trim());
+  const steps = clampSteps(params.model, params.steps, params.width, params.height);
+  const body: Record<string, unknown> = {
+    model: params.model,
+    positivePrompt: positive,
+    negativePrompt: params.negative,
+    width: params.width,
+    height: params.height,
+    steps,
+    scale: params.cfg,
+    sampler: params.sampler,
+    seed,
+    noise_schedule: params.noiseSchedule,
+    promptGuidanceRescale: params.cfgRescale,
+    sm: false,
+    sm_dyn: false,
+    autoSmea: false,
+    decrisp: params.decrisper,
+    variety: params.varietyPlus,
+    prefer_brownian: true,
+    deliberate_euler_ancestral_bug: false,
+    legacy: false,
+    legacy_uc: false,
+    legacy_v3_extend: false,
+    use_coords: params.useCoords,
+    use_upscale_credits: false,
+  };
+  if (chars.length) {
+    body.characterPrompts = chars.map((c) => ({
+      prompt: c.prompt.trim(),
+      uc: c.uc.trim(),
+      center: { x: c.x, y: c.y },
+      enabled: true,
+    }));
+    body.v4_prompt_char_captions = chars.map((c) => ({
+      char_caption: c.prompt.trim(),
+      centers: [{ x: c.x, y: c.y }],
+    }));
+    body.v4_negative_prompt_char_captions = chars.map((c) => ({
+      char_caption: c.uc.trim(),
+      centers: [{ x: c.x, y: c.y }],
+    }));
+  }
+  return body;
+}
+
+function ensureSubjectToken(prompt: string): string {
+  const t = prompt.trim();
+  if (!t) return "girl";
+  const swapped = t.replace(/\b1girl\b/gi, "girl").replace(/\b1boy\b/gi, "boy");
+  if (/\b(girl|boy|other)\b/i.test(swapped)) return swapped;
+  return `girl, ${swapped}`;
+}
+
+function countWord(n: number, one: string, many: string, plus?: string): string | null {
+  if (n <= 0) return null;
+  if (n === 1) return one;
+  if (plus && n >= 6) return plus;
+  return `${n}${many}`;
+}
+
+export function ensureCountTags(base: string, chars: { prompt: string; enabled: boolean }[]): string {
+  if (/\b(\d+\s*)?(girl|boy|other)s?\b/i.test(base) || /\b(solo|1girl|2girls|3girls|4girls|5girls|6\+girls|1boy|2boys|multiple girls|multiple boys)\b/i.test(base)) {
+    return base;
+  }
+  let girls = 0;
+  let boys = 0;
+  let others = 0;
+  for (const c of chars.filter((x) => x.enabled)) {
+    const p = c.prompt.toLowerCase();
+    if (/\bboy\b/.test(p) && !/\bgirl\b/.test(p)) boys++;
+    else if (/\bother\b/.test(p) && !/\b(girl|boy)\b/.test(p)) others++;
+    else girls++;
+  }
+  const tags = [
+    countWord(girls, "1girl", "girls", "6+girls"),
+    countWord(boys, "1boy", "boys"),
+    countWord(others, "1other", "others"),
+  ].filter(Boolean) as string[];
+  if (!tags.length) return base;
+  return base.trim() ? `${tags.join(", ")}, ${base}` : tags.join(", ");
+}
+
+export function buildGeneratePayload(role: Role, grokRaw: string): { positive: string; params: ImageParams; enabled?: boolean[] } {
+  const dir = parseImageDirective(grokRaw);
+  const params = cloneImageParams(role.imageParams);
+  const multi = isMultiDraft(role.draft);
+  const pack = role.draft.promptPack === "split" ? "split" : "flat";
+  const cast = role.draft.cast ?? [];
+
+  const inferred = presenceFromDirective(dir, params.characters.length);
+  if (inferred) {
+    params.characters = params.characters.map((c, i) => ({
+      ...c,
+      enabled: inferred[i] ?? false,
+    }));
+  } else if (multi && cast.some((m) => m.away)) {
+    params.characters = params.characters.map((c, i) => (cast[i]?.away ? { ...c, enabled: false } : c));
+  }
+  const enabledFlags = multi ? params.characters.map((c) => c.enabled) : inferred;
+  if (dir.coords === "ai") {
+    params.useCoords = false;
+  } else if (Array.isArray(dir.coords) && dir.coords.length) {
+    params.useCoords = true;
+    const pts = dir.coords;
+    params.characters = params.characters.map((c, i) => ({
+      ...c,
+      x: pts[i]?.x ?? c.x,
+      y: pts[i]?.y ?? c.y,
+    }));
+  }
+
+  if (pack === "split" && multi && params.characters.length) {
+    params.characters = params.characters.map((c, i) => {
+      const appearance = cast[i]?.appearance?.trim() ?? "";
+      const stored = c.prompt.trim() || appearance;
+      const extra = dir.chars[i]?.trim() ?? "";
+      const merged = [stored, extra].filter(Boolean).join(", ");
+      return { ...c, prompt: c.enabled ? ensureSubjectToken(merged) : merged };
+    });
+  }
+
+  const mid = multi
+    ? params.promptMid
+    : params.promptMid || role.draft.appearance;
+  const grokExtra = stripDirectiveLabels(
+    pack === "split" && multi ? dir.base : flattenGrokPrompt(dir, false) || dir.base,
+  );
+  let positive = stripDirectiveLabels(joinPrompt(params.promptFront, mid, grokExtra, params.promptBack));
+  if (multi) {
+    positive = ensureCountTags(positive, params.characters);
+  }
+  return { positive, params, enabled: enabledFlags };
+}

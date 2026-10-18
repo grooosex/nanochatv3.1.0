@@ -1,0 +1,44 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { grokComplete } from "@/lib/grok.server";
+import { packedPromptForStore } from "@/lib/parse-reply";
+import { buildPromptRewriteSystem } from "@/lib/system-prompt";
+import type { GrokModelId } from "@/lib/types";
+
+export const Route = createFileRoute("/api/prompt")({
+  server: {
+    handlers: {
+      POST: async ({ request }) => {
+        const body = (await request.json()) as {
+          model: GrokModelId;
+          context: string;
+          previous?: string;
+          instruction?: string;
+          multi?: boolean;
+          names?: string[];
+          adult?: boolean;
+        };
+        const multi = Boolean(body.multi);
+        const result = await grokComplete({
+          model: body.model,
+          messages: [
+            { role: "system", content: buildPromptRewriteSystem(multi, body.names ?? [], Boolean(body.adult)) },
+            {
+              role: "user",
+              content: `剧情上下文：\n${body.context}\n\n原提示词：${body.previous || "（无）"}\n${body.instruction ? "额外要求：" + body.instruction : ""}`,
+            },
+          ],
+          temperature: 0.7,
+          maxTokens: multi ? 1200 : 700,
+        });
+        if (!result.ok) return Response.json({ error: result.error }, { status: 500 });
+        let text = result.text.replace(/```[\s\S]*?```/g, (m) => m.replace(/```(?:\w+)?/g, "")).trim();
+        text = text.replace(/<<<PROMPT>>>|<<<END>>>/gi, "").trim();
+        if (!multi) {
+          text = text.split("\n").filter(Boolean).pop() ?? text;
+        }
+        text = packedPromptForStore(text, multi);
+        return Response.json({ prompt: text });
+      },
+    },
+  },
+});

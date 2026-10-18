@@ -1,0 +1,1640 @@
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  ArrowUp,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsDown,
+  ChevronsUp,
+  Download,
+  GitBranch,
+  LoaderCircle,
+  Pencil,
+  RefreshCw,
+  Sparkles,
+  WandSparkles,
+} from "lucide-react";
+import { cn } from "@/lib/cn";
+import {
+  applyAwayBack,
+  applyPresenceToParams,
+  castSlotLabel,
+  isGroupMode,
+  isMultiDraft,
+  resolveCastMember,
+} from "@/lib/cast";
+import { parseDirectorNotes, uid } from "@/lib/defaults";
+import { savePngBase64 } from "@/lib/idb";
+import {
+  clipMemoryText,
+  collapsedForMemory,
+  formatTranscript,
+  splitMemoryWindow,
+  takeHeadByChars,
+} from "@/lib/chat-memory";
+import { resolvedConn, postNai } from "@/lib/nai-conn";
+import { buildGeneratePayload, resolveSeed } from "@/lib/nai-payload";
+import {
+  collapseGroupMessages,
+  extractAwayBack,
+  extractStatus,
+  flattenGrokPrompt,
+  formatDirectiveForEdit,
+  historyForGrok,
+  packedPromptForStore,
+  parseGroupReply,
+  parseImageDirective,
+  peekGroupStream,
+  reconstructDirective,
+  splitReply,
+  stripAwayBackMarkers,
+  stripDirectiveLabels,
+} from "@/lib/parse-reply";
+import { showToast } from "@/lib/toast";
+import { useAppStore } from "@/lib/store";
+import { openingUserLine } from "@/lib/system-prompt";
+import {
+  capVersions,
+  snapshotTurn,
+  turnHost,
+  turnMessages,
+  versionPager,
+  withCurrentSnapshot,
+} from "@/lib/reply-versions";
+import {
+  CHAT_MODES,
+  GROK_MODELS,
+  IMAGE_PHASE_LABEL,
+  NAI_MODELS,
+  PROMPT_PACK_MODES,
+  shortSampler,
+  type ChatImage,
+  type ChatMessage,
+  type ChatMode,
+  type GrokModelId,
+  type ImageBusy,
+  type ImageParams,
+  type ImagePhase,
+  type ParamsFocusField,
+  type PromptPackMode,
+  type Role,
+  type RoleMemory,
+  type ReplyVersion,
+} from "@/lib/types";
+import { Btn, FieldLabel, ImagePager, MenuSelect, Modal, Switch } from "./ui";
+import { TagBox } from "./tag-suggest";
+import { NaiCooldownLabel } from "./nai-cooldown-label";
+import { useObjectUrl } from "./use-object-url";
+
+function messageImages(m: ChatMessage): ChatImage[] {
+  if (m.images?.length) return m.images;
+  return m.image ? [m.image] : [];
+}
+
+function currentImage(m: ChatMessage): ChatImage | undefined {
+  const imgs = messageImages(m);
+  if (!imgs.length) return undefined;
+  const idx = Math.min(Math.max(m.imageIndex ?? imgs.length - 1, 0), imgs.length - 1);
+  return imgs[idx];
+}
+
+function ImageGenMeta({ image }: { image: ChatImage }) {
+  const modelLabel = NAI_MODELS.find((m) => m.id === image.model)?.label ?? image.model ?? "模型";
+  const samplerLabel = shortSampler(image.sampler);
+  const seedText = image.seed == null ? "" : String(image.seed);
+  const jump = (field: ParamsFocusField) => {
+    useAppStore.getState().focusParams(field, field === "seed" ? image.seed : undefined);
+  };
+  const chip = (field: ParamsFocusField, label: string) => (
+    <button type="button" className="shrink-0 py-0.5 active:text-ink" onClick={() => jump(field)}>
+      {label}
+    </button>
+  );
+  return (
+    <div className="mb-2 flex min-w-0 items-baseline gap-1.5 text-[11px] leading-4 text-muted tabular-nums">
+      <div className="flex min-w-0 flex-1 items-baseline gap-2 overflow-hidden whitespace-nowrap">
+        {chip("model", modelLabel)}
+        {chip("size", `${image.width}×${image.height}`)}
+        {chip("steps", `${image.steps}步`)}
+        {chip("sampler", samplerLabel)}
+        <button
+          type="button"
+          className="min-w-0 truncate py-0.5 tabular-nums active:text-ink"
+          title={seedText}
+          onClick={() => jump("seed")}
+        >
+          {seedText}
+        </button>
+      </div>
+      <button
+        type="button"
+        className="shrink-0 py-0.5 text-[11px] font-medium text-danger active:opacity-70"
+        title="角色提示词"
+        onClick={() => jump("chars")}
+      >
+        多
+      </button>
+    </div>
+  );
+}
+
+function persistPresence(roleId: string, enabled?: boolean[]) {
+  const r = useAppStore.getState().roles.find((x) => x.id === roleId);
+  if (!r || !isMultiDraft(r.draft)) return;
+  const next = applyPresenceToParams(r.draft, r.imageParams, enabled);
+  const params = {
+    ...next.params,
+    characters: next.params.characters.map((c, i) => ({
+      ...c,
+      prompt: c.prompt.trim() ? c.prompt : (next.draft.cast?.[i]?.appearance ?? ""),
+    })),
+  };
+  useAppStore.getState().patchRole(roleId, {
+    draft: next.draft,
+    imageParams: params,
+  });
+}
+
+function persistAwayBack(roleId: string, away: string[], back: string[]) {
+  if (!away.length && !back.length) return;
+  const r = useAppStore.getState().roles.find((x) => x.id === roleId);
+  if (!r || !isMultiDraft(r.draft)) return;
+  const draft = applyAwayBack(r.draft, away, back);
+  const next = applyPresenceToParams(draft, r.imageParams);
+  useAppStore.getState().patchRole(roleId, {
+    draft: next.draft,
+    imageParams: next.params,
+  });
+}
+
+function applyReplyVersion(roleId: string, hostId: string, version: ReplyVersion, index: number) {
+  const store = useAppStore.getState();
+  const role = store.roles.find((r) => r.id === roleId);
+  if (!role) return;
+  const host = role.messages.find((m) => m.id === hostId);
+  if (!host) return;
+  const imgs = version.images?.length ? version.images : undefined;
+  const imgIdx = version.imageIndex ?? (imgs ? imgs.length - 1 : undefined);
+  const image = imgs && imgIdx != null ? imgs[imgIdx] : undefined;
+  const gid = host.groupTurnId;
+  if (!gid) {
+    store.patchMessage(roleId, hostId, {
+      text: version.bubbles[0]?.text ?? host.text,
+      statusBar: version.bubbles[0]?.statusBar,
+      images: imgs,
+      image,
+      imageIndex: imgIdx,
+      imagePrompt: version.imagePrompt,
+      replyVersionIndex: index,
+      imagePending: false,
+      imagePhase: undefined,
+      imageBusy: undefined,
+      imageError: undefined,
+    });
+    return;
+  }
+  const start = role.messages.findIndex((m) => m.groupTurnId === gid);
+  if (start < 0) return;
+  const turn = role.messages.filter((m) => m.groupTurnId === gid);
+  const before = role.messages.slice(0, start);
+  const after = role.messages.slice(start + turn.length);
+  const hostBubbleIdx = version.bubbles.findIndex((b) => b.speakerId === "narrator");
+  const hIdx = hostBubbleIdx >= 0 ? hostBubbleIdx : version.bubbles.length - 1;
+  const others = turn.filter((m) => m.id !== hostId);
+  const created = version.bubbles.map((b, i) => {
+    const isHost = i === hIdx;
+    const prev = isHost ? host : others[i < hIdx ? i : i - 1];
+    return {
+      id: isHost ? hostId : prev?.id ?? uid("msg"),
+      role: "assistant" as const,
+      text: b.text,
+      statusBar: b.statusBar,
+      speakerId: b.speakerId,
+      speakerName: b.speakerName,
+      speakerAvatarId: b.speakerAvatarId,
+      groupTurnId: gid,
+      createdAt: prev?.createdAt ?? Date.now(),
+      ...(isHost
+        ? {
+            images: imgs,
+            image,
+            imageIndex: imgIdx,
+            imagePrompt: version.imagePrompt,
+            replyVersions: host.replyVersions,
+            replyVersionIndex: index,
+            imagePending: false,
+            imagePhase: undefined,
+            imageBusy: undefined,
+            imageError: undefined,
+          }
+        : {}),
+    };
+  });
+  store.replaceMessages(roleId, [...before, ...created, ...after]);
+}
+
+function sealTurnVersions(roleId: string, hostId: string, carry?: ReplyVersion[]) {
+  const role = useAppStore.getState().roles.find((r) => r.id === roleId);
+  if (!role) return;
+  const host = role.messages.find((m) => m.id === hostId);
+  if (!host || host.role !== "assistant") return;
+  const snap = snapshotTurn(role, host);
+  const all = capVersions([...(carry ?? []), snap]);
+  useAppStore.getState().patchMessage(roleId, hostId, {
+    replyVersions: all,
+    replyVersionIndex: all.length - 1,
+  });
+}
+
+function segmentMessage(
+  seg: { kind: "char" | "narrate"; name: string; text: string },
+  cast: Role["draft"]["cast"],
+  groupTurnId: string,
+  id: string,
+): ChatMessage {
+  if (seg.kind === "narrate")
+    return {
+      id,
+      role: "assistant",
+      text: seg.text,
+      speakerId: "narrator",
+      speakerName: "旁白",
+      groupTurnId,
+      createdAt: Date.now(),
+    };
+  const member = resolveCastMember(cast ?? [], seg.name);
+  return {
+    id,
+    role: "assistant",
+    text: seg.text,
+    speakerId: member?.id ?? seg.name,
+    speakerName: member?.name || seg.name,
+    speakerAvatarId: member?.avatarImageId,
+    groupTurnId,
+    createdAt: Date.now(),
+  };
+}
+
+function upsertGroupBubbles(
+  roleId: string,
+  placeholderId: string,
+  groupTurnId: string,
+  segments: { kind: "char" | "narrate"; name: string; text: string }[],
+  ids: string[],
+) {
+  if (!segments.length) return;
+  const store = useAppStore.getState();
+  const live = store.roles.find((x) => x.id === roleId);
+  if (!live) return;
+  const kept = live.messages.filter((m) => m.id !== placeholderId && m.groupTurnId !== groupTurnId);
+  const existing = live.messages.filter((m) => m.groupTurnId === groupTurnId || m.id === placeholderId);
+  const created = segments.map((seg, i) => {
+    const id = ids[i] ?? existing[i]?.id ?? (i === 0 ? placeholderId : uid("msg"));
+    ids[i] = id;
+    const prev = existing.find((m) => m.id === id);
+    const next = segmentMessage(seg, live.draft.cast, groupTurnId, id);
+    if (!prev) return next;
+    return {
+      ...prev,
+      text: next.text,
+      speakerId: next.speakerId,
+      speakerName: next.speakerName,
+      speakerAvatarId: next.speakerAvatarId,
+      groupTurnId,
+    };
+  });
+  store.replaceMessages(roleId, [...kept, ...created]);
+}
+
+async function naiGenerate(
+  positive: string,
+  role: Role,
+  forceNewSeed: boolean,
+  onPhase: (phase: ImagePhase) => void,
+  signal?: AbortSignal,
+  paramsOverride?: ImageParams,
+) {
+  const conn = resolvedConn(useAppStore.getState().settings.connection);
+  const params = paramsOverride ?? role.imageParams;
+  const seed = resolveSeed(params, forceNewSeed);
+  const json = await postNai({
+    params,
+    positive,
+    seed,
+    key: conn.naiKey,
+    base: conn.naiBase,
+    onPhase,
+    signal,
+  });
+  return {
+    b64: json.image,
+    seed: json.seed ?? seed,
+  };
+}
+
+async function streamChat(
+  role: Role,
+  history: { role: "user" | "assistant"; content: string }[],
+  notes: string[],
+  signal?: AbortSignal,
+  memory?: string,
+) {
+  const model = useAppStore.getState().settings.grokModel;
+  const res = await fetch("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      draft: role.draft,
+      history,
+      directorNotes: notes,
+      memory,
+    }),
+    signal,
+  });
+  if (!res.ok || !res.body) {
+    const err = (await res.json().catch(() => ({ error: "请求失败" }))) as { error?: string };
+    throw new Error(err.error || "请求失败");
+  }
+  return res.body.getReader();
+}
+
+function isAbort(e: unknown, signal?: AbortSignal) {
+  return (
+    Boolean(signal?.aborted) ||
+    (e instanceof DOMException && e.name === "AbortError") ||
+    (e instanceof Error && e.name === "AbortError")
+  );
+}
+
+const imageAbortMap = new Map<string, AbortController>();
+let chatAbort: AbortController | null = null;
+
+function abortChatTurn() {
+  chatAbort?.abort();
+  chatAbort = null;
+}
+
+function abortImageJob(msgId: string) {
+  const c = imageAbortMap.get(msgId);
+  if (c) c.abort();
+}
+
+function beginChatTurn() {
+  abortChatTurn();
+  chatAbort = new AbortController();
+  return chatAbort.signal;
+}
+
+const memoryJobs = new Map<string, Promise<void>>();
+
+function applyMemory(roleId: string, memory: RoleMemory) {
+  const role = useAppStore.getState().roles.find((r) => r.id === roleId);
+  if (!role) return;
+  const n = collapsedForMemory(role.messages).length;
+  if (memory.covered > n) return;
+  const cur = role.memory;
+  if (cur && cur.covered >= memory.covered && cur.updatedAt >= memory.updatedAt) return;
+  useAppStore.getState().patchRole(roleId, { memory });
+}
+
+async function foldMemoryOnce(roleId: string, collapsed: { role: "user" | "assistant"; text: string }[]) {
+  const role = useAppStore.getState().roles.find((r) => r.id === roleId);
+  if (!role) return;
+  const split = splitMemoryWindow(collapsed, role.memory);
+  if (!split.needsFold && !split.dropped) return;
+  const batch = takeHeadByChars(split.toFold);
+  if (!batch.length) return;
+  const names = [
+    role.draft.name,
+    ...(role.draft.cast ?? []).map((c) => c.name),
+  ]
+    .map((n) => n.trim())
+    .filter(Boolean);
+  const res = await fetch("/api/memory", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      previous: role.memory?.text ?? "",
+      transcript: formatTranscript(batch),
+      names,
+    }),
+  });
+  if (!res.ok) return;
+  const json = (await res.json()) as { memory?: string };
+  const text = clipMemoryText(json.memory ?? "");
+  if (!text) return;
+  applyMemory(roleId, {
+    text,
+    covered: split.covered + batch.length,
+    updatedAt: Date.now(),
+  });
+}
+
+function queueMemory(roleId: string, collapsed: { role: "user" | "assistant"; text: string }[]) {
+  const prev = memoryJobs.get(roleId);
+  const job = (async () => {
+    if (prev) await prev.catch(() => undefined);
+    await foldMemoryOnce(roleId, collapsed);
+  })().finally(() => {
+    if (memoryJobs.get(roleId) === job) memoryJobs.delete(roleId);
+  });
+  memoryJobs.set(roleId, job);
+  return job;
+}
+
+async function ensureMemoryForSend(roleId: string, collapsed: { role: "user" | "assistant"; text: string }[]) {
+  const inflight = memoryJobs.get(roleId);
+  if (inflight) await inflight.catch(() => undefined);
+  let live = useAppStore.getState().roles.find((r) => r.id === roleId);
+  let split = splitMemoryWindow(collapsed, live?.memory);
+  let passes = 0;
+  while (split.dropped && passes < 2) {
+    passes += 1;
+    await queueMemory(roleId, collapsed);
+    live = useAppStore.getState().roles.find((r) => r.id === roleId);
+    split = splitMemoryWindow(collapsed, live?.memory);
+  }
+  if (split.needsFold) void queueMemory(roleId, collapsed);
+  return live?.memory;
+}
+
+function scheduleMemoryRefresh(roleId: string) {
+  const role = useAppStore.getState().roles.find((r) => r.id === roleId);
+  if (!role) return;
+  const collapsed = collapsedForMemory(role.messages);
+  const split = splitMemoryWindow(collapsed, role.memory);
+  if (split.needsFold || split.dropped) void queueMemory(roleId, collapsed);
+}
+
+async function runAssistantTurn(opts: {
+  roleId: string;
+  displayUser?: string;
+  modelUser?: string;
+  notes: string[];
+  replaceAssistantId?: string;
+  signal?: AbortSignal;
+  carryVersions?: ReplyVersion[];
+}) {
+  const store = useAppStore.getState();
+  if (!store.roles.find((r) => r.id === opts.roleId)) return;
+  if (opts.replaceAssistantId) {
+    abortImageJob(opts.replaceAssistantId);
+    const latest0 = store.roles.find((r) => r.id === opts.roleId);
+    const gid = latest0?.messages.find((m) => m.id === opts.replaceAssistantId)?.groupTurnId;
+    if (gid && latest0) {
+      for (const m of latest0.messages) if (m.groupTurnId === gid) abortImageJob(m.id);
+      const first = latest0.messages.find((m) => m.groupTurnId === gid);
+      store.truncateFrom(opts.roleId, first?.id ?? opts.replaceAssistantId, true);
+    } else store.truncateFrom(opts.roleId, opts.replaceAssistantId, true);
+  }
+  if (opts.displayUser)
+    store.appendMessage(opts.roleId, {
+      id: uid("msg"),
+      role: "user",
+      text: opts.displayUser,
+      createdAt: Date.now(),
+    });
+  const asstId = uid("msg");
+  store.appendMessage(opts.roleId, {
+    id: asstId,
+    role: "assistant",
+    text: "",
+    imagePending: false,
+    createdAt: Date.now(),
+  });
+  const latest = useAppStore.getState().roles.find((r) => r.id === opts.roleId);
+  if (!latest) return;
+  const group = isGroupMode(latest.draft);
+  const priorMsgs = latest.messages.filter((m) => m.id !== asstId);
+  let forGrok = collapseGroupMessages(priorMsgs);
+  if (opts.modelUser) {
+    if (forGrok.at(-1)?.role === "user")
+      forGrok = [...forGrok.slice(0, -1), { role: "user", text: opts.modelUser }];
+    else forGrok = [...forGrok, { role: "user", text: opts.modelUser }];
+  }
+  let mem: RoleMemory | undefined;
+  try {
+    mem = await ensureMemoryForSend(opts.roleId, forGrok);
+  } catch {
+    mem = useAppStore.getState().roles.find((r) => r.id === opts.roleId)?.memory;
+  }
+  if (opts.signal?.aborted) return;
+  const liveRole = useAppStore.getState().roles.find((r) => r.id === opts.roleId) ?? latest;
+  const { recent } = splitMemoryWindow(forGrok, mem ?? liveRole.memory);
+  const hist = historyForGrok(recent);
+  try {
+    const reader = await streamChat(liveRole, hist, opts.notes, opts.signal, (mem ?? liveRole.memory)?.text);
+    const decoder = new TextDecoder();
+    let acc = "";
+    const groupTurnId = uid("turn");
+    const bubbleIds: string[] = [];
+    while (true) {
+      if (opts.signal?.aborted) return;
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (opts.signal?.aborted) return;
+      acc += decoder.decode(value, { stream: true });
+      if (group) {
+        const segs = peekGroupStream(acc).segments.filter((s) => s.name.trim() || s.text.trim());
+        if (segs.length) upsertGroupBubbles(opts.roleId, asstId, groupTurnId, segs, bubbleIds);
+      } else {
+        const vis = acc.split(/<<<PROMPT>>>/i)[0];
+        useAppStore.getState().patchMessage(opts.roleId, asstId, { text: vis });
+      }
+    }
+    if (opts.signal?.aborted) return;
+    const parsedGroup = group ? parseGroupReply(acc) : null;
+    if (parsedGroup && parsedGroup.segments.length) {
+      if (parsedGroup.away.length || parsedGroup.back.length) {
+        persistAwayBack(opts.roleId, parsedGroup.away, parsedGroup.back);
+      }
+      upsertGroupBubbles(opts.roleId, asstId, groupTurnId, parsedGroup.segments, bubbleIds);
+      const created = (useAppStore.getState().roles.find((x) => x.id === opts.roleId)?.messages ?? []).filter(
+        (m) => m.groupTurnId === groupTurnId,
+      );
+      const host = created.find((m) => m.speakerId === "narrator") ?? created[created.length - 1];
+      if (host) useAppStore.getState().patchMessage(opts.roleId, host.id, { imagePending: true });
+      const statusSrc = created.find((m) => m.speakerId === "narrator")?.text ?? created.map((m) => m.text).join("\n");
+      const status = extractStatus(statusSrc);
+      if (status && host) {
+        useAppStore.getState().patchMessage(opts.roleId, host.id, { statusBar: status });
+        const r = useAppStore.getState().roles.find((x) => x.id === opts.roleId);
+        if (r)
+          useAppStore.getState().patchRole(opts.roleId, {
+            draft: { ...r.draft, statusText: status },
+          });
+      }
+      if (host) sealTurnVersions(opts.roleId, host.id, opts.carryVersions);
+      let prompt = parsedGroup.prompt;
+      void (async () => {
+        if (opts.signal?.aborted) return;
+        const context = parsedGroup.segments
+          .map((s) => `【${s.kind === "narrate" ? "旁白" : s.name}】${s.text}`)
+          .join("\n");
+        if (!prompt && context.trim())
+          try {
+            const json = (await (
+              await fetch("/api/prompt", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  model: useAppStore.getState().settings.grokModel,
+                  context,
+                  multi: true,
+                  adult: Boolean(useAppStore.getState().roles.find((x) => x.id === opts.roleId)?.draft.adultPrompt),
+                  names: (useAppStore.getState().roles.find((x) => x.id === opts.roleId)?.draft.cast ?? []).map(
+                    (c) => c.name,
+                  ),
+                }),
+                signal: opts.signal,
+              })
+            ).json()) as { prompt?: string };
+            if (json.prompt) prompt = json.prompt;
+          } catch (e) {
+            if (isAbort(e, opts.signal)) return;
+          }
+        if (opts.signal?.aborted) return;
+        if (prompt && host) await attachImage(opts.roleId, host.id, prompt, false);
+        else if (host) useAppStore.getState().patchMessage(opts.roleId, host.id, { imagePending: false });
+      })();
+      scheduleMemoryRefresh(opts.roleId);
+      return;
+    }
+    const { text: rawText, prompt: parsedPrompt } = splitReply(acc);
+    const { away, back } = extractAwayBack(acc);
+    persistAwayBack(opts.roleId, away, back);
+    const text = stripAwayBackMarkers(rawText);
+    let prompt = parsedPrompt;
+    const status = extractStatus(text);
+    useAppStore.getState().patchMessage(opts.roleId, asstId, {
+      text,
+      imagePending: true,
+      statusBar: status,
+    });
+    sealTurnVersions(opts.roleId, asstId, opts.carryVersions);
+    if (status) {
+      const r = useAppStore.getState().roles.find((x) => x.id === opts.roleId);
+      if (r)
+        useAppStore.getState().patchRole(opts.roleId, {
+          draft: { ...r.draft, statusText: status },
+        });
+    }
+    scheduleMemoryRefresh(opts.roleId);
+    void (async () => {
+      if (opts.signal?.aborted) return;
+      if (!prompt && text.trim())
+        try {
+          const json = (await (
+            await fetch("/api/prompt", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                model: useAppStore.getState().settings.grokModel,
+                context: text,
+                multi: Boolean(useAppStore.getState().roles.find((x) => x.id === opts.roleId)?.draft.multi),
+                adult: Boolean(useAppStore.getState().roles.find((x) => x.id === opts.roleId)?.draft.adultPrompt),
+                names: (useAppStore.getState().roles.find((x) => x.id === opts.roleId)?.draft.cast ?? []).map(
+                  (c) => c.name,
+                ),
+              }),
+              signal: opts.signal,
+            })
+          ).json()) as { prompt?: string };
+          if (json.prompt) prompt = json.prompt;
+        } catch (e) {
+          if (isAbort(e, opts.signal)) return;
+        }
+      if (opts.signal?.aborted) return;
+      if (prompt) await attachImage(opts.roleId, asstId, prompt, false);
+      else useAppStore.getState().patchMessage(opts.roleId, asstId, { imagePending: false });
+    })();
+  } catch (e) {
+    if (isAbort(e, opts.signal)) return;
+    useAppStore.getState().patchMessage(opts.roleId, asstId, {
+      text: e instanceof Error ? e.message : "回复失败",
+      imagePending: false,
+    });
+  }
+}
+
+async function attachImage(roleId: string, msgId: string, prompt: string, forceNewSeed: boolean, busyKind?: ImageBusy) {
+  abortImageJob(msgId);
+  const ac = new AbortController();
+  imageAbortMap.set(msgId, ac);
+  const role = useAppStore.getState().roles.find((r) => r.id === roleId);
+  if (!role) return;
+  const msg = role.messages.find((m) => m.id === msgId);
+  const existing = msg ? messageImages(msg) : [];
+  const isFirst = existing.length === 0;
+  const storedPrompt = packedPromptForStore(prompt, isMultiDraft(role.draft));
+  useAppStore.getState().patchMessage(roleId, msgId, {
+    imagePending: isFirst,
+    imageError: undefined,
+    imagePhase: "submit",
+    imageBusy: busyKind,
+    imagePrompt: storedPrompt,
+  });
+  const onPhase = (phase: ImagePhase) => {
+    if (ac.signal.aborted) return;
+    useAppStore.getState().patchMessage(
+      roleId,
+      msgId,
+      isFirst ? { imagePhase: phase, imagePending: true } : { imagePhase: phase },
+    );
+  };
+  try {
+    const { positive, params, enabled } = buildGeneratePayload(role, storedPrompt);
+    if (isMultiDraft(role.draft)) persistPresence(roleId, enabled ?? params.characters.map((c) => c.enabled));
+    const { b64, seed } = await naiGenerate(positive, role, forceNewSeed, onPhase, ac.signal, params);
+    if (ac.signal.aborted || imageAbortMap.get(msgId) !== ac) return;
+    if (params.seedLocked) {
+      const live = useAppStore.getState().roles.find((r) => r.id === roleId);
+      if (live) {
+        useAppStore.getState().updateRoleParams(roleId, { ...live.imageParams, seed: String(seed ?? 0) });
+      }
+    }
+    const imageId = uid("img");
+    await savePngBase64(imageId, b64);
+    if (ac.signal.aborted || imageAbortMap.get(msgId) !== ac) return;
+    const image: ChatImage = {
+      id: imageId,
+      prompt: storedPrompt,
+      seed: seed ?? 0,
+      model: role.imageParams.model,
+      width: role.imageParams.width,
+      height: role.imageParams.height,
+      steps: role.imageParams.steps,
+      sampler: role.imageParams.sampler,
+    };
+    const images = [...existing, image];
+    const liveMsg = useAppStore.getState().roles.find((r) => r.id === roleId)?.messages.find((m) => m.id === msgId);
+    const idx = liveMsg?.replyVersionIndex ?? (liveMsg?.replyVersions?.length ? liveMsg.replyVersions.length - 1 : -1);
+    const replyVersions =
+      liveMsg?.replyVersions && idx >= 0
+        ? liveMsg.replyVersions.map((v, i) =>
+            i === idx
+              ? { ...v, images: images.map((im) => ({ ...im })), imageIndex: images.length - 1, imagePrompt: storedPrompt }
+              : v,
+          )
+        : liveMsg?.replyVersions;
+    useAppStore.getState().patchMessage(roleId, msgId, {
+      image,
+      images,
+      imageIndex: images.length - 1,
+      imagePending: false,
+      imagePhase: undefined,
+      imageBusy: undefined,
+      imageError: undefined,
+      imageAttempted: true,
+      imagePrompt: storedPrompt,
+      ...(replyVersions ? { replyVersions } : {}),
+    });
+    const r2 = useAppStore.getState().roles.find((r) => r.id === roleId);
+    const firstAsstImg = r2?.messages.find((m) => m.role === "assistant" && (m.image || m.images?.length));
+    if (r2 && (!r2.avatarImageId || firstAsstImg?.id === msgId))
+      useAppStore.getState().patchRole(roleId, { avatarImageId: imageId });
+  } catch (e) {
+    if (isAbort(e, ac.signal)) {
+      if (imageAbortMap.get(msgId) === ac) {
+        useAppStore.getState().patchMessage(roleId, msgId, {
+          imagePending: false,
+          imagePhase: undefined,
+          imageBusy: undefined,
+        });
+      }
+      return;
+    }
+    useAppStore.getState().patchMessage(roleId, msgId, {
+      imagePending: false,
+      imagePhase: undefined,
+      imageBusy: undefined,
+      imageAttempted: true,
+      imagePrompt: storedPrompt,
+      imageError: e instanceof Error ? e.message : "生图失败",
+    });
+  } finally {
+    if (imageAbortMap.get(msgId) === ac) imageAbortMap.delete(msgId);
+  }
+}
+
+const chatScrollByRole = new Map<string, number>();
+
+const PILL_WRAP = "w-32 shrink-0";
+const PILL_TRIGGER =
+  "flex h-8 w-full items-center justify-center rounded-full border border-line bg-paper px-1.5 text-[12px] text-ink";
+
+export function ChatView({ role, active = true }: { role: Role; active?: boolean }) {
+  const grokModel = useAppStore((s) => s.settings.grokModel);
+  const setGrokModel = useAppStore((s) => s.setGrokModel);
+  const branchFrom = useAppStore((s) => s.branchFrom);
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [customMsg, setCustomMsg] = useState<ChatMessage | null>(null);
+  const [customPrompt, setCustomPrompt] = useState("");
+  const [customBase, setCustomBase] = useState("");
+  const [customChars, setCustomChars] = useState<string[]>([]);
+  const [asstEditId, setAsstEditId] = useState<string | null>(null);
+  const [asstEditText, setAsstEditText] = useState("");
+  const [atBottom, setAtBottom] = useState(true);
+  const [canScroll, setCanScroll] = useState(false);
+  const roleId = role.id;
+  const scroller = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const turnRef = useRef(0);
+  const prevRoleIdRef = useRef(roleId);
+  const prevActiveRef = useRef(active);
+  const roleIdRef = useRef(roleId);
+  const restoringRef = useRef(false);
+  const avatar = useObjectUrl(role.avatarImageId);
+  const measureScroll = () => {
+    const el = scroller.current;
+    if (!el) return;
+    const overflow = el.scrollHeight - el.clientHeight;
+    setCanScroll(overflow > 8);
+    setAtBottom(overflow <= 8 || el.scrollHeight - el.scrollTop - el.clientHeight <= 56);
+  };
+  if (scroller.current) {
+    if (prevRoleIdRef.current !== roleId) chatScrollByRole.set(prevRoleIdRef.current, scroller.current.scrollTop);
+    else if (prevActiveRef.current && !active) chatScrollByRole.set(roleId, scroller.current.scrollTop);
+  }
+  prevRoleIdRef.current = roleId;
+  prevActiveRef.current = active;
+  roleIdRef.current = roleId;
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    if (!el || !active) return;
+    restoringRef.current = true;
+    el.scrollTop = chatScrollByRole.get(roleId) ?? 0;
+    restoringRef.current = false;
+    measureScroll();
+  }, [roleId, active]);
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const onScroll = () => {
+      if (restoringRef.current) return;
+      if (getComputedStyle(el).display === "none") return;
+      chatScrollByRole.set(roleIdRef.current, el.scrollTop);
+      measureScroll();
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => measureScroll()) : null;
+    ro?.observe(el);
+    const mo = typeof MutationObserver !== "undefined" ? new MutationObserver(() => measureScroll()) : null;
+    mo?.observe(el, { childList: true, subtree: true, characterData: true });
+    return () => {
+      chatScrollByRole.set(roleIdRef.current, el.scrollTop);
+      el.removeEventListener("scroll", onScroll);
+      ro?.disconnect();
+      mo?.disconnect();
+    };
+  }, []);
+  useLayoutEffect(() => {
+    if (!active) return;
+    measureScroll();
+  }, [active, role.messages.length, role.messages.at(-1)?.id, role.messages.at(-1)?.text, role.messages.at(-1)?.imagePending, role.messages.at(-1)?.imagePhase]);
+  useEffect(() => {
+    setText("");
+    setEditId(null);
+    setCustomMsg(null);
+    setCustomPrompt("");
+    setCustomBase("");
+    setCustomChars([]);
+    setAsstEditId(null);
+    setAsstEditText("");
+    setBusy(false);
+    turnRef.current += 1;
+  }, [roleId]);
+
+  const send = async (raw: string) => {
+    const t = raw.trim();
+    if (!t) return;
+    const editing = editId;
+    if (busy && !editing) return;
+    abortChatTurn();
+    setText("");
+    const my = ++turnRef.current;
+    setBusy(true);
+    setEditId(null);
+    const { say, notes } = parseDirectorNotes(t);
+    if (editing) useAppStore.getState().truncateFrom(role.id, editing, true);
+    const signal = beginChatTurn();
+    await runAssistantTurn({
+      roleId: role.id,
+      displayUser: t,
+      modelUser: notes.length ? `${say || t}\n\n（导演指令：${notes.join("；")}）` : say || t,
+      notes,
+      signal,
+    });
+    if (turnRef.current === my) setBusy(false);
+  };
+
+  const regenAssistant = async (msg: ChatMessage) => {
+    abortChatTurn();
+    abortImageJob(msg.id);
+    const my = ++turnRef.current;
+    setBusy(true);
+    const latest = useAppStore.getState().roles.find((r) => r.id === role.id) ?? role;
+    const idx = latest.messages.findIndex((m) => m.id === msg.id);
+    const prevUser = [...latest.messages.slice(0, idx)].reverse().find((m) => m.role === "user");
+    const { say, notes } = parseDirectorNotes(prevUser?.text ?? "请继续。");
+    const host = turnHost(turnMessages(latest, msg));
+    const carry = withCurrentSnapshot(host.replyVersions, snapshotTurn(latest, host));
+    const signal = beginChatTurn();
+    await runAssistantTurn({
+      roleId: role.id,
+      modelUser: say || prevUser?.text || "请继续。",
+      notes,
+      replaceAssistantId: msg.id,
+      signal,
+      carryVersions: carry,
+    });
+    if (turnRef.current === my) setBusy(false);
+  };
+
+  const openCustom = (m: ChatMessage) => {
+    const latest = useAppStore.getState().roles.find((r) => r.id === role.id) ?? role;
+    const live = latest.messages.find((x) => x.id === m.id) ?? m;
+    const raw = currentImage(live)?.prompt ?? live.imagePrompt ?? "";
+    const dir = parseImageDirective(raw);
+    const multi = isMultiDraft(latest.draft);
+    setCustomMsg(live);
+    setCustomPrompt(
+      multi
+        ? formatDirectiveForEdit(dir) || packedPromptForStore(raw, true) || raw
+        : stripDirectiveLabels(flattenGrokPrompt(dir, false) || packedPromptForStore(raw, false) || raw),
+    );
+    setCustomBase(dir.base);
+    const n = Math.max(latest.imageParams.characters.length, dir.chars.length, latest.draft.cast?.length ?? 0, 1);
+    setCustomChars(Array.from({ length: n }, (_, i) => dir.chars[i] ?? ""));
+  };
+
+  return (
+    <div className="flex h-full min-h-0 min-w-0 w-full max-w-full flex-1 flex-col overflow-hidden">
+      <div className="sticky top-0 z-10 flex min-w-0 shrink-0 items-center justify-center gap-2 overflow-hidden border-b border-line/60 bg-bg px-3 py-2">
+        {isMultiDraft(role.draft) ? (
+          <div className={PILL_WRAP} style={{ width: 128 }}>
+            <MenuSelect
+              compact
+              align="start"
+              className="block w-full"
+              value={role.draft.promptPack === "split" ? "split" : "flat"}
+              onChange={(id) =>
+                useAppStore.getState().patchRole(role.id, {
+                  draft: { ...role.draft, promptPack: id as PromptPackMode },
+                })
+              }
+              options={PROMPT_PACK_MODES.map((m) => ({ id: m.id, label: m.label }))}
+              triggerClassName={PILL_TRIGGER}
+            />
+          </div>
+        ) : (
+          <div className={PILL_WRAP} style={{ width: 128 }} />
+        )}
+        <MenuSelect
+          compact
+          balance
+          align="center"
+          className="shrink-0"
+          value={grokModel}
+          onChange={(id) => setGrokModel(id as GrokModelId)}
+          options={GROK_MODELS.map((m) => ({ id: m.id, label: m.short }))}
+          triggerClassName="inline-grid grid-cols-[0.875rem_auto_0.875rem] items-center bg-transparent py-1 text-[15px] text-ink"
+        />
+        {isMultiDraft(role.draft) ? (
+          <div className={PILL_WRAP} style={{ width: 128 }}>
+            <MenuSelect
+              compact
+              align="end"
+              className="block w-full"
+              value={role.draft.chatMode === "group" ? "group" : "together"}
+              onChange={(id) =>
+                useAppStore.getState().patchRole(role.id, {
+                  draft: { ...role.draft, chatMode: id as ChatMode },
+                })
+              }
+              options={CHAT_MODES.map((m) => ({ id: m.id, label: m.label }))}
+              triggerClassName={PILL_TRIGGER}
+            />
+          </div>
+        ) : (
+          <div className={PILL_WRAP} style={{ width: 128 }} />
+        )}
+      </div>
+
+      <div ref={scroller} className="app-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-8">
+        {role.messages.length === 0 ? (
+          <div className="mx-auto mt-6 max-w-md rounded-2xl bg-paper px-4 py-4 text-[13px] leading-7 text-primary">
+            <p>聊天：在输入框里写完点发送即可。</p>
+            <p>生图参数：只作用于当前角色的配图，模型、提示词、分辨率、步数都在那里改。</p>
+            <p>纯生图：只出图，不聊天，参数和聊天完全独立。</p>
+            <p>顶栏可切换 Grok 模型，润色人设、写提示词、聊天回复都用同一个。</p>
+            <p className="text-muted">对 {role.name} 说点什么，或用《》向 Grok 提要求。</p>
+          </div>
+        ) : null}
+        {role.messages.map((m, i) =>
+          m.role === "user" ? (
+            <UserBubble
+              key={m.id}
+              msg={m}
+              branchDisabled={busy}
+              onEdit={() => {
+                abortChatTurn();
+                const latest = useAppStore.getState().roles.find((r) => r.id === role.id);
+                if (latest) {
+                  const idx = latest.messages.findIndex((x) => x.id === m.id);
+                  if (idx >= 0) {
+                    for (const later of latest.messages.slice(idx + 1)) abortImageJob(later.id);
+                    useAppStore.getState().truncateFrom(role.id, m.id, false);
+                  }
+                }
+                turnRef.current += 1;
+                setBusy(false);
+                setCustomMsg(null);
+                setEditId(m.id);
+                setText(m.text);
+                requestAnimationFrame(() => inputRef.current?.focus());
+              }}
+              onBranch={() => branchFrom(role.id, m.id)}
+            />
+          ) : (
+            <AssistantBlock
+              key={m.id}
+              role={role}
+              msg={m}
+              avatar={avatar}
+              showTurnActions={
+                !m.groupTurnId || !role.messages.slice(i + 1).some((x) => x.groupTurnId === m.groupTurnId)
+              }
+              showImage={
+                !m.groupTurnId ||
+                m.speakerId === "narrator" ||
+                (!role.messages.some((x) => x.groupTurnId === m.groupTurnId && x.speakerId === "narrator") &&
+                  !role.messages.slice(i + 1).some((x) => x.groupTurnId === m.groupTurnId))
+              }
+              editing={asstEditId === m.id}
+              editText={asstEditText}
+              onRegen={() => void regenAssistant(m)}
+              onBranch={() => branchFrom(role.id, m.id)}
+              onEdit={() => {
+                setAsstEditId(m.id);
+                setAsstEditText(m.text);
+              }}
+              onEditChange={setAsstEditText}
+              onEditSave={() => {
+                const latest = useAppStore.getState().roles.find((r) => r.id === role.id) ?? role;
+                const host = turnHost(turnMessages(latest, m));
+                const versions = host.replyVersions;
+                const turn = turnMessages(latest, m);
+                const bi = turn.findIndex((x) => x.id === m.id);
+                const nextVersions =
+                  versions?.length && bi >= 0
+                    ? versions.map((v, vi) =>
+                        vi === (host.replyVersionIndex ?? versions.length - 1)
+                          ? {
+                              ...v,
+                              bubbles: v.bubbles.map((b, j) => (j === bi ? { ...b, text: asstEditText } : b)),
+                            }
+                          : v,
+                      )
+                    : undefined;
+                useAppStore.getState().patchMessage(role.id, m.id, {
+                  text: asstEditText,
+                  ...(host.id === m.id && nextVersions ? { replyVersions: nextVersions } : {}),
+                });
+                if (host.id !== m.id && nextVersions) {
+                  useAppStore.getState().patchMessage(role.id, host.id, { replyVersions: nextVersions });
+                }
+                setAsstEditId(null);
+              }}
+              onEditCancel={() => {
+                setAsstEditId(null);
+                setAsstEditText("");
+              }}
+              onSwitchVersion={(dir) => {
+                const latest = useAppStore.getState().roles.find((r) => r.id === role.id) ?? role;
+                const host = turnHost(turnMessages(latest, m));
+                const versions = host.replyVersions ?? [];
+                if (versions.length < 2) return;
+                const cur = host.replyVersionIndex ?? versions.length - 1;
+                const next = (cur + dir + versions.length) % versions.length;
+                applyReplyVersion(role.id, host.id, versions[next], next);
+              }}
+              onRedraw={(forceNew, newPrompt) => {
+                const cur = currentImage(m);
+                void attachImage(role.id, m.id, newPrompt ?? cur?.prompt ?? m.imagePrompt ?? "", forceNew, "redraw");
+              }}
+              onRewritePrompt={async () => {
+                abortImageJob(m.id);
+                const cur = currentImage(m);
+                if (!cur && !m.text && !m.imagePrompt) return;
+                useAppStore.getState().patchMessage(role.id, m.id, {
+                  imageBusy: "rewrite",
+                  imagePhase: "submit",
+                });
+                const turnCtx = m.groupTurnId
+                  ? role.messages
+                      .filter((x) => x.groupTurnId === m.groupTurnId)
+                      .map((x) => `【${x.speakerId === "narrator" ? "旁白" : x.speakerName || "角色"}】${x.text}`)
+                      .join("\n")
+                  : m.text;
+                try {
+                  const res = await fetch("/api/prompt", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      model: grokModel,
+                      context: turnCtx,
+                      previous: cur?.prompt ?? m.imagePrompt,
+                      multi: Boolean(role.draft.multi),
+                      adult: Boolean(role.draft.adultPrompt),
+                      names: (role.draft.cast ?? []).map((c) => c.name),
+                    }),
+                  });
+                  const json = (await res.json()) as { prompt?: string; error?: string };
+                  if (!res.ok || !json.prompt) throw new Error(json.error || "重写失败");
+                  await attachImage(role.id, m.id, json.prompt, true, "rewrite");
+                } catch (e) {
+                  useAppStore.getState().patchMessage(role.id, m.id, {
+                    imageBusy: undefined,
+                    imagePhase: undefined,
+                    imageAttempted: true,
+                  });
+                  showToast(e instanceof Error ? e.message : "失败", "err");
+                }
+              }}
+              onCustom={() => openCustom(m)}
+            />
+          ),
+        )}
+      </div>
+
+      <div className="min-w-0 max-w-full shrink-0 bg-bg px-3 pb-[max(8px,env(safe-area-inset-bottom))] pt-1">
+        <div className="flex h-6 items-center gap-1.5 px-0.5 text-[13px] leading-none">
+          <div className="inline-flex h-[22px] items-center gap-1.5 rounded-md border border-line px-1.5">
+            <button
+              type="button"
+              className={role.imageParams.width < role.imageParams.height ? "text-ink" : "text-muted"}
+              onClick={() => {
+                const p = role.imageParams;
+                if (p.width < p.height) return;
+                useAppStore.getState().updateRoleParams(role.id, { ...p, width: p.height, height: p.width });
+              }}
+            >
+              竖图
+            </button>
+            <span className="text-faint">|</span>
+            <button
+              type="button"
+              className={role.imageParams.width >= role.imageParams.height ? "text-ink" : "text-muted"}
+              onClick={() => {
+                const p = role.imageParams;
+                if (p.width >= p.height) return;
+                useAppStore.getState().updateRoleParams(role.id, { ...p, width: p.height, height: p.width });
+              }}
+            >
+              横图
+            </button>
+          </div>
+          <div className="flex min-w-0 flex-1 items-center justify-center">
+            <NaiCooldownLabel className="text-[13px] leading-none" />
+          </div>
+          <button
+            type="button"
+            className={cn(
+              "inline-flex h-[22px] items-center rounded-md border border-line px-1.5",
+              role.draft.adultPrompt ? "font-medium text-ink" : "text-muted",
+            )}
+            onClick={() =>
+              useAppStore.getState().updateRoleDraft(role.id, {
+                ...role.draft,
+                adultPrompt: !role.draft.adultPrompt,
+              })
+            }
+          >
+            成人提示词
+          </button>
+        </div>
+        <div className="flex min-w-0 max-w-full items-end gap-2">
+          {canScroll ? (
+            <button
+              type="button"
+              className="mb-1 flex size-8 shrink-0 items-center justify-center rounded-full text-faint"
+              aria-label={atBottom ? "回到顶部" : "回到底部"}
+              title={atBottom ? "回到顶部" : "回到底部"}
+              onClick={() => {
+                const el = scroller.current;
+                if (!el) return;
+                el.scrollTo({ top: atBottom ? 0 : el.scrollHeight, behavior: "smooth" });
+              }}
+            >
+              {atBottom ? <ChevronsUp className="size-4" strokeWidth={1.75} /> : <ChevronsDown className="size-4" strokeWidth={1.75} />}
+            </button>
+          ) : null}
+          <form
+            className="min-w-0 flex-1"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void send(text);
+            }}
+          >
+            <div className="flex min-w-0 items-end gap-2 rounded-full border border-line bg-paper px-2 py-1 shadow-soft">
+              <textarea
+                ref={inputRef}
+                rows={1}
+                value={text}
+                placeholder={editId ? "在聊天框里改这条消息，发送即覆盖并重新回复" : undefined}
+                className="max-h-32 min-h-9 min-w-0 flex-1 resize-none bg-transparent px-3 py-1.5 text-sm outline-none"
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    void send(text);
+                  }
+                  if (e.key === "Escape" && editId) {
+                    setEditId(null);
+                    setText("");
+                  }
+                }}
+              />
+              <button
+                type="submit"
+                disabled={!text.trim()}
+                className={cn(
+                  "mb-0.5 flex size-9 shrink-0 items-center justify-center rounded-full text-primary-fg",
+                  text.trim() ? "bg-primary" : "bg-rose opacity-40",
+                )}
+                aria-label="发送"
+              >
+                <ArrowUp className="size-5" strokeWidth={2.4} />
+              </button>
+            </div>
+            {editId ? (
+              <button
+                type="button"
+                className="mt-1 w-full text-center text-[11px] text-muted"
+                onClick={() => {
+                  setEditId(null);
+                  setText("");
+                }}
+              >
+                取消编辑
+              </button>
+            ) : null}
+          </form>
+        </div>
+      </div>
+
+      <Modal open={Boolean(customMsg)} onClose={() => setCustomMsg(null)} wide>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h3 className="min-w-0 font-medium">自定义修改提示词</h3>
+          <div className="flex shrink-0 items-center gap-1">
+            <span className="text-[11px] whitespace-nowrap text-muted">标签建议</span>
+            <Switch
+              size="sm"
+              checked={role.customTagSuggest !== false}
+              label="标签建议"
+              onChange={(v) => useAppStore.getState().patchRole(role.id, { customTagSuggest: v })}
+            />
+          </div>
+        </div>
+        {isMultiDraft(role.draft) && role.draft.promptPack === "split" ? (
+          <div className="space-y-3">
+            <p className="text-[11px] leading-5 text-muted">
+              总提示追加到「正面提示词 · 中」后面，各角色追加到对应角色正面提示词后面。不会写入 ENABLED。
+            </p>
+            <div>
+              <FieldLabel>总提示（正面提示词 · 中）</FieldLabel>
+              <TagBox
+                value={customBase}
+                onChange={setCustomBase}
+                enabled={role.customTagSuggest !== false}
+                minHeight="6rem"
+              />
+            </div>
+            {customChars.map((c, i) => (
+              <div key={i}>
+                <FieldLabel>
+                  {castSlotLabel(i, role.draft.cast?.[i]?.name)} 正面提示词
+                </FieldLabel>
+                <TagBox
+                  value={c}
+                  onChange={(v) => {
+                    const next = [...customChars];
+                    next[i] = v;
+                    setCustomChars(next);
+                  }}
+                  enabled={role.customTagSuggest !== false}
+                  minHeight="5rem"
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <TagBox
+            value={customPrompt}
+            onChange={setCustomPrompt}
+            enabled={role.customTagSuggest !== false}
+            minHeight="10rem"
+          />
+        )}
+        <div className="mt-4 flex gap-2">
+          <Btn variant="ghost" className="flex-1" onClick={() => setCustomMsg(null)}>
+            取消
+          </Btn>
+          <Btn
+            className="flex-1"
+            onClick={() => {
+              if (!customMsg) return;
+              const id = customMsg.id;
+              const prompt =
+                isMultiDraft(role.draft) && role.draft.promptPack === "split"
+                  ? reconstructDirective(customBase, customChars)
+                  : packedPromptForStore(customPrompt, isMultiDraft(role.draft));
+              setCustomMsg(null);
+              abortImageJob(id);
+              void attachImage(role.id, id, prompt, true, "custom");
+            }}
+          >
+            重新生成
+          </Btn>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+function UserBubble({
+  msg,
+  onEdit,
+  onBranch,
+  branchDisabled,
+}: {
+  msg: ChatMessage;
+  onEdit: () => void;
+  onBranch: () => void;
+  branchDisabled?: boolean;
+}) {
+  return (
+    <div className="relative z-10 ml-10 mb-5 flex flex-col items-end">
+      <div className="max-w-[85%] break-words rounded-2xl bg-ink px-3.5 py-2.5 text-left text-sm leading-6 text-bg whitespace-pre-wrap">
+        {msg.text}
+      </div>
+      <div className="mt-2 flex gap-2">
+        <button
+          type="button"
+          disabled={branchDisabled}
+          className="inline-flex items-center gap-1 rounded-full bg-paper px-3 py-1 text-[11px] text-muted disabled:opacity-40"
+          onClick={onBranch}
+        >
+          <GitBranch className="size-3" /> 开分支
+        </button>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-full bg-paper px-3 py-1 text-[11px] text-muted"
+          onClick={onEdit}
+        >
+          <Pencil className="size-3" /> 编辑
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AssistantBlock({
+  role,
+  msg,
+  avatar,
+  showTurnActions = true,
+  showImage = true,
+  editing,
+  editText,
+  onRegen,
+  onBranch,
+  onEdit,
+  onEditChange,
+  onEditSave,
+  onEditCancel,
+  onSwitchVersion,
+  onRedraw,
+  onRewritePrompt,
+  onCustom,
+}: {
+  role: Role;
+  msg: ChatMessage;
+  avatar: string | null;
+  showTurnActions?: boolean;
+  showImage?: boolean;
+  editing?: boolean;
+  editText?: string;
+  onRegen: () => void;
+  onBranch: () => void;
+  onEdit: () => void;
+  onEditChange: (v: string) => void;
+  onEditSave: () => void;
+  onEditCancel: () => void;
+  onSwitchVersion: (dir: number) => void;
+  onRedraw: (forceNew: boolean, newPrompt?: string) => void;
+  onRewritePrompt: () => void;
+  onCustom: () => void;
+}) {
+  const imgs = messageImages(msg);
+  const idx = Math.min(Math.max(msg.imageIndex ?? (imgs.length ? imgs.length - 1 : 0), 0), Math.max(imgs.length - 1, 0));
+  const cur = imgs[idx];
+  const speakerUrl = useObjectUrl(msg.speakerAvatarId);
+  const img = useObjectUrl(cur?.id);
+  const waiting = !msg.text && !msg.imageError;
+  const [dlOk, setDlOk] = useState(false);
+  const phaseText = IMAGE_PHASE_LABEL[msg.imagePhase ?? "submit"];
+  const ar = (cur?.width ?? role.imageParams.width) / (cur?.height ?? role.imageParams.height);
+  const narrate = msg.speakerId === "narrator";
+  const named = Boolean(msg.speakerId && msg.speakerId !== "narrator");
+  const face = named ? speakerUrl : avatar;
+  const label = named ? msg.speakerName || role.name : role.name;
+  const setIndex = (next: number) => {
+    if (!imgs.length) return;
+    const wrapped = ((next % imgs.length) + imgs.length) % imgs.length;
+    if (wrapped === idx) return;
+    useAppStore.getState().patchMessage(role.id, msg.id, {
+      imageIndex: wrapped,
+      image: imgs[wrapped],
+    });
+  };
+  const showImgSlot = showImage && Boolean(
+    img ||
+      cur ||
+      msg.imagePending ||
+      msg.imagePhase ||
+      msg.imageAttempted ||
+      msg.imageError ||
+      msg.imagePrompt,
+  );
+  const lastPrompt = cur?.prompt ?? msg.imagePrompt ?? "";
+  const imgPad = narrate || named ? "" : "ml-11";
+  const actionPad = narrate || named ? "" : "pl-11";
+  const host = turnHost(turnMessages(role, msg));
+  const pager = showTurnActions && !waiting ? versionPager(host.replyVersions, host.replyVersionIndex) : null;
+  if (waiting && isGroupMode(role.draft) && !msg.speakerId)
+    return <div className="mb-6 px-1 text-sm text-muted">回复中</div>;
+  return (
+    <div className="mb-6">
+      {narrate ? (
+        <div className="mb-2 text-xs font-medium text-muted">旁白</div>
+      ) : (
+        <div className="mb-2 flex items-center gap-2">
+          <button
+            type="button"
+            className="flex items-center gap-2 rounded-full pr-2"
+            aria-label={`修改${role.name}的设定`}
+            onClick={() => {
+              useAppStore.setState({
+                composer: "edit",
+                editingRoleId: role.id,
+                activeRoleId: role.id,
+                tab: "chat",
+                sidebarOpen: false,
+              });
+            }}
+          >
+            <div className="size-9 overflow-hidden rounded-full bg-ink/10">
+              {face ? (
+                <img src={face} alt="" className="size-full object-cover" />
+              ) : (
+                <span className="flex size-full items-center justify-center font-serif text-sm text-primary">
+                  {(label || role.name).slice(0, 1)}
+                </span>
+              )}
+            </div>
+            <div className="text-[15px] font-semibold">{label}</div>
+          </button>
+        </div>
+      )}
+      <div
+        className={cn(
+          "select-text text-ink whitespace-pre-wrap",
+          narrate
+            ? "rounded-2xl bg-paper px-4 py-3 text-sm leading-6 text-muted"
+            : named
+              ? "max-w-[85%] rounded-2xl bg-paper px-3.5 py-2.5 text-sm leading-6"
+              : "prose-rp pl-11",
+        )}
+      >
+        {waiting ? (
+          <span className="text-muted">回复中</span>
+        ) : editing ? (
+          <textarea
+            value={editText}
+            onChange={(e) => onEditChange(e.target.value)}
+            className="min-h-24 w-full resize-y bg-transparent text-sm leading-6 text-ink outline-none"
+            autoFocus
+          />
+        ) : (
+          msg.text
+        )}
+      </div>
+      {editing ? (
+        <div className={cn("mt-2 flex gap-2", actionPad)}>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded-full bg-paper px-3 py-1 text-[11px] text-muted"
+            onClick={onEditCancel}
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1 text-[11px] text-primary-fg"
+            onClick={onEditSave}
+          >
+            保存
+          </button>
+        </div>
+      ) : (
+        <>
+          {showTurnActions ? (
+            <div className={cn("mt-2 flex flex-wrap gap-2", actionPad)}>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-full bg-paper px-3 py-1 text-[11px] text-muted"
+                onClick={onRegen}
+              >
+                <RefreshCw className="size-3" /> 重新生成
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-full bg-paper px-3 py-1 text-[11px] text-muted"
+                onClick={onBranch}
+              >
+                <GitBranch className="size-3" /> 开分支
+              </button>
+              {!waiting ? (
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 rounded-full bg-paper px-3 py-1 text-[11px] text-muted"
+                  onClick={onEdit}
+                >
+                  <Pencil className="size-3" /> 编辑
+                </button>
+              ) : null}
+            </div>
+          ) : waiting ? null : (
+            <div className={cn("mt-2 flex gap-2", actionPad)}>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-full bg-paper px-3 py-1 text-[11px] text-muted"
+                onClick={onEdit}
+              >
+                <Pencil className="size-3" /> 编辑
+              </button>
+            </div>
+          )}
+          {pager ? (
+            <div className={cn("mt-1 flex items-center gap-1 text-muted", actionPad)}>
+              <button
+                type="button"
+                className="flex size-7 items-center justify-center rounded-full hover:bg-ink/6"
+                aria-label="上一版"
+                onClick={() => onSwitchVersion(-1)}
+              >
+                <ChevronLeft className="size-4" />
+              </button>
+              <span className="min-w-8 text-center text-[11px] tabular-nums">
+                {pager.current}/{pager.total}
+              </span>
+              <button
+                type="button"
+                className="flex size-7 items-center justify-center rounded-full hover:bg-ink/6"
+                aria-label="下一版"
+                onClick={() => onSwitchVersion(1)}
+              >
+                <ChevronRight className="size-4" />
+              </button>
+            </div>
+          ) : null}
+        </>
+      )}
+      {showImgSlot ? (
+        <div className={cn("mt-3 max-w-sm", imgPad)}>
+          {showImage && msg.imagePending && !img ? (
+            <div
+              className="flex w-full items-center justify-center rounded-2xl bg-ink/8 text-sm text-muted"
+              style={{ aspectRatio: String(ar) }}
+            >
+              {phaseText}
+            </div>
+          ) : null}
+          {cur ? <ImageGenMeta image={cur} /> : null}
+          {img && cur ? (
+            <ImagePager src={img} imgClassName="w-full rounded-2xl" onOlder={() => setIndex(idx - 1)} onNewer={() => setIndex(idx + 1)} />
+          ) : null}
+          {msg.imageError ? <p className="mt-2 text-xs text-danger">{msg.imageError}</p> : null}
+          <div className="mt-2 flex justify-around text-[11px] text-muted">
+            <button
+              type="button"
+              className="inline-flex flex-col items-center gap-1"
+              onClick={() => onRedraw(true, lastPrompt)}
+            >
+              {msg.imageBusy === "redraw" ? (
+                <LoaderCircle className="size-4 animate-spin" />
+              ) : (
+                <RefreshCw className="size-4" />
+              )}
+              重新生成
+            </button>
+            <button
+              type="button"
+              className="inline-flex flex-col items-center gap-1"
+              onClick={onRewritePrompt}
+            >
+              {msg.imageBusy === "rewrite" ? (
+                <LoaderCircle className="size-4 animate-spin" />
+              ) : (
+                <Sparkles className="size-4" />
+              )}
+              换提示词生成
+            </button>
+            <button
+              type="button"
+              disabled={!img || !cur}
+              className="inline-flex flex-col items-center gap-1 disabled:opacity-40"
+              onClick={async () => {
+                if (!img || !cur) return;
+                const a = document.createElement("a");
+                a.href = img;
+                a.download = `${cur.seed}.png`;
+                a.click();
+                setDlOk(true);
+                showToast("已下载");
+                setTimeout(() => setDlOk(false), 1000);
+              }}
+            >
+              {dlOk ? <Check className="size-4 text-ok" /> : <Download className="size-4" />} 下载
+            </button>
+            <button type="button" className="inline-flex flex-col items-center gap-1" onClick={onCustom}>
+              {msg.imageBusy === "custom" ? (
+                <LoaderCircle className="size-4 animate-spin" />
+              ) : (
+                <WandSparkles className="size-4" />
+              )}
+              自定义修改
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function kickoffRole(roleId: string) {
+  const role = useAppStore.getState().roles.find((r) => r.id === roleId);
+  if (!role || role.messages.length > 0) return;
+  const signal = beginChatTurn();
+  void runAssistantTurn({
+    roleId,
+    modelUser: openingUserLine(role.draft),
+    notes: [],
+    signal,
+  });
+}

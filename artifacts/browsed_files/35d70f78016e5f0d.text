@@ -1,0 +1,82 @@
+import { collapseGroupMessages } from "./parse-reply";
+import type { ChatMessage, RoleMemory } from "./types";
+
+export type CollapsedMsg = { role: "user" | "assistant"; text: string };
+
+/** 原文窗口：大约十几轮对白。超出的部分进长期记忆。 */
+const KEEP_RECENT = 24;
+/** 送给模型的最近原文上限（汉字为主，约等于中等长度长聊）。 */
+const RECENT_CHAR_BUDGET = 28000;
+/** 一次并入记忆的最大字数。太长就从最早的未覆盖段切。 */
+const DIGEST_CHAR_BUDGET = 16000;
+const MEMORY_CHAR_CAP = 3800;
+/** 至少积了这么多条未覆盖前文才值得再总结。 */
+const SUMMARIZE_MIN = 6;
+
+function clip(s: string, max: number): string {
+  const t = s.trim();
+  if (t.length <= max) return t;
+  return t.slice(0, max).replace(/\s+\S*$/, "").trim();
+}
+
+export function clipMemoryText(text: string): string {
+  return clip(text, MEMORY_CHAR_CAP);
+}
+
+export function collapsedForMemory(messages: ChatMessage[]): CollapsedMsg[] {
+  return collapseGroupMessages(messages.filter((m) => m.role === "user" || Boolean(m.text.trim())));
+}
+
+function takeTailByChars(msgs: CollapsedMsg[], budget: number): CollapsedMsg[] {
+  let acc = 0;
+  const out: CollapsedMsg[] = [];
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const n = msgs[i].text.length + 8;
+    if (out.length && acc + n > budget) break;
+    out.unshift(msgs[i]);
+    acc += n;
+  }
+  return out;
+}
+
+export function takeHeadByChars(msgs: CollapsedMsg[], budget = DIGEST_CHAR_BUDGET): CollapsedMsg[] {
+  let acc = 0;
+  const out: CollapsedMsg[] = [];
+  for (const m of msgs) {
+    const n = m.text.length + 8;
+    if (out.length && acc + n > budget) break;
+    out.push(m);
+    acc += n;
+  }
+  return out;
+}
+
+export function splitMemoryWindow(messages: CollapsedMsg[], memory?: RoleMemory | null) {
+  const covered = memory?.text ? Math.min(Math.max(0, memory.covered), messages.length) : 0;
+  const verbatim = messages.slice(covered);
+  const recent = takeTailByChars(verbatim, RECENT_CHAR_BUDGET);
+  const countFoldEnd = Math.max(covered, messages.length - KEEP_RECENT);
+  const charFoldEnd = covered + Math.max(0, verbatim.length - recent.length);
+  const foldEnd = Math.max(countFoldEnd, charFoldEnd);
+  const toFold = messages.slice(covered, foldEnd);
+  return {
+    covered,
+    toFold,
+    recent,
+    dropped: recent.length < verbatim.length,
+    needsFold: toFold.length >= SUMMARIZE_MIN || (recent.length < verbatim.length && toFold.length > 0),
+  };
+}
+
+export function formatTranscript(msgs: CollapsedMsg[]): string {
+  return msgs
+    .map((m) => (m.role === "user" ? `你：\n${m.text}` : m.text))
+    .join("\n\n---\n\n");
+}
+
+export function memoryAfterTruncate(memory: RoleMemory | undefined, kept: ChatMessage[]): RoleMemory | undefined {
+  if (!memory?.text) return undefined;
+  const n = collapsedForMemory(kept).length;
+  if (memory.covered > n) return undefined;
+  return memory;
+}

@@ -1,0 +1,364 @@
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { Download, FileUp, X } from "lucide-react";
+import { Btn, Modal, TextInput } from "./ui";
+import { cn } from "@/lib/cn";
+import { useAppStore } from "@/lib/store";
+import { writeNaiBackup } from "@/lib/nai-conn";
+import {
+  applyArchivePack,
+  downloadArchive,
+  formatArchiveSummary,
+  readArchiveFile,
+  type ArchivePack,
+} from "@/lib/archive";
+import { showToast } from "@/lib/toast";
+
+type Busy = "pack" | "read" | "apply" | null;
+type DlMode = "all" | "none";
+type ImportMode = "merge" | "selected" | "backup" | "overwrite";
+
+export function ConnectDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const connection = useAppStore((s) => s.settings.connection);
+  const setConnection = useAppStore((s) => s.setConnection);
+  const [key, setKey] = useState(connection.naiKey);
+  const [base, setBase] = useState(connection.naiBase);
+  const [busy, setBusy] = useState<Busy>(null);
+  const [packHint, setPackHint] = useState("");
+  const [pending, setPending] = useState<ArchivePack | null>(null);
+  const [dlOpen, setDlOpen] = useState(false);
+  const [dlMode, setDlMode] = useState<DlMode>("all");
+  const [importMode, setImportMode] = useState<ImportMode>("merge");
+  const [pickedRoleIds, setPickedRoleIds] = useState<string[]>([]);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      setKey(connection.naiKey);
+      setBase(connection.naiBase);
+      setPending(null);
+      setBusy(null);
+      setPackHint("");
+      setDlOpen(false);
+      setDlMode("all");
+      setImportMode("merge");
+      setPickedRoleIds([]);
+    }
+  }, [open, connection]);
+
+  const save = (k = key, b = base) => {
+    setConnection(k, b);
+  };
+
+  const onDownload = async () => {
+    if (busy) return;
+    setBusy("pack");
+    setPackHint("");
+    const includeImages = dlMode === "all";
+    try {
+      const sum = await downloadArchive({
+        includeImages,
+        onProgress: (done, total) => {
+          if (total) setPackHint(`${done}/${total}`);
+        },
+      });
+      setDlOpen(false);
+      if (sum.skippedImages) {
+        showToast("已下载存档，配图因体积跳过，聊天和卡片都在", "ok", 2800);
+      } else if (sum.withoutImages) {
+        showToast("已下载无配图存档", "ok", 2200);
+      } else {
+        showToast(`已下载存档（${formatArchiveSummary(sum)}）`, "ok", 2200);
+      }
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "打包失败", "err");
+    } finally {
+      setBusy(null);
+      setPackHint("");
+    }
+  };
+
+  const onPick = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || busy) return;
+    setBusy("read");
+    try {
+      const pack = await readArchiveFile(file);
+      setDlOpen(false);
+      setPending(pack);
+      setImportMode("merge");
+      setPickedRoleIds((pack.archive.roles ?? []).map((r) => r.id));
+    } catch (err) {
+      setPending(null);
+      showToast(err instanceof Error ? err.message : "无法读取存档", "err");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const confirmImport = async () => {
+    if (!pending || busy) return;
+    if (importMode === "selected" && pickedRoleIds.length === 0) {
+      showToast("请先勾选要导入的聊天", "err");
+      return;
+    }
+    setBusy("apply");
+    try {
+      if (importMode === "backup") {
+        await downloadArchive({ includeImages: true });
+      }
+      const merge = importMode === "merge" || importMode === "selected";
+      const sum = await applyArchivePack(pending, {
+        mode: merge ? "merge" : "overwrite",
+        roleIds: importMode === "selected" ? pickedRoleIds : undefined,
+      });
+      showToast(`已导入 ${formatArchiveSummary(sum)}`, "ok", 2200);
+      setPending(null);
+      onClose();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "导入失败", "err");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose}>
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-semibold">连接</h2>
+        <button type="button" className="size-9 rounded-full hover:bg-ink/6" onClick={onClose} aria-label="关闭">
+          <X className="mx-auto size-5" />
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          type="button"
+          disabled={!!busy}
+          className="flex min-h-16 flex-col items-center justify-center gap-1 rounded-[1.25rem] border border-line bg-paper px-2 py-3 text-ink disabled:opacity-50"
+          onClick={() => {
+            if (busy) return;
+            setPending(null);
+            setDlOpen(true);
+          }}
+        >
+          <Download className="size-6" />
+          <span className="text-center text-xs leading-4 text-muted">
+            {busy === "pack" ? (packHint ? `打包中 ${packHint}` : "打包中…") : "下载存档"}
+          </span>
+        </button>
+        <button
+          type="button"
+          disabled={!!busy}
+          className="flex min-h-16 flex-col items-center justify-center gap-1 rounded-[1.25rem] border border-line bg-paper px-2 py-3 text-ink disabled:opacity-50"
+          onClick={() => {
+            if (busy) return;
+            setDlOpen(false);
+            fileRef.current?.click();
+          }}
+        >
+          <FileUp className="size-6" />
+          <span className="text-center text-xs leading-4 text-muted">
+            {busy === "read" ? "读取中…" : "读取存档"}
+          </span>
+        </button>
+      </div>
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".zip,.json,application/zip,application/json"
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden
+        onChange={(e) => void onPick(e)}
+      />
+      {dlOpen ? (
+        <div className="mt-4 rounded-2xl border border-line bg-paper-2 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-medium">下载存档</h3>
+            <button
+              type="button"
+              className="size-8 rounded-full text-muted hover:bg-ink/6"
+              onClick={() => setDlOpen(false)}
+              aria-label="关闭"
+            >
+              <X className="mx-auto size-4" />
+            </button>
+          </div>
+          <div className="flex items-center justify-center gap-10 py-2">
+            <RadioChoice selected={dlMode === "all"} onSelect={() => setDlMode("all")} label="全部" />
+            <RadioChoice selected={dlMode === "none"} onSelect={() => setDlMode("none")} label="无配图" />
+          </div>
+          <p className="mt-1 text-center text-[11px] leading-5 text-muted">
+            {dlMode === "all" ? "聊天、文件夹、角色卡和配图都会打进文件。" : "不打包配图。提示词还在，导入后可重新生成。"}
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <Btn variant="ghost" disabled={busy === "pack"} onClick={() => setDlOpen(false)}>
+              取消
+            </Btn>
+            <Btn disabled={busy === "pack"} onClick={() => void onDownload()}>
+              {busy === "pack" ? (packHint ? `打包中 ${packHint}` : "打包中…") : "确认"}
+            </Btn>
+          </div>
+        </div>
+      ) : null}
+      {pending ? (
+        <div className="mt-4 rounded-2xl border border-line bg-paper-2 p-4">
+          <p className="text-sm leading-6">将导入 {formatArchiveSummary(pending.summary)}。</p>
+          <p className="mt-1 text-xs leading-5 text-muted">
+            连接密钥仍留在这台设备上。
+            {pending.summary.withoutImages ? " 这份是无配图存档，聊天里会留下提示词，可再生成。" : ""}
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {(
+              [
+                ["merge", "合并"],
+                ["selected", "只导入选中"],
+                ["backup", "先备份再覆盖"],
+                ["overwrite", "直接覆盖"],
+              ] as const
+            ).map(([id, label]) => (
+              <RadioChoice
+                key={id}
+                selected={importMode === id}
+                onSelect={() => setImportMode(id)}
+                label={label}
+              />
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] leading-5 text-muted">
+            {importMode === "merge"
+              ? "加进本机，已有聊天和卡片都留下。"
+              : importMode === "selected"
+                ? "只把勾上的聊天加进来。"
+                : importMode === "backup"
+                  ? "先下载一份当前存档，再换成读进来的。"
+                  : "立刻换成读进来的，本机现有聊天会被替换。"}
+          </p>
+          {importMode === "selected" ? (
+            <div className="mt-3 max-h-40 overflow-y-auto rounded-xl border border-line bg-paper px-2 py-1">
+              {(pending.archive.roles ?? []).map((r) => {
+                const on = pickedRoleIds.includes(r.id);
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    className="flex w-full items-center gap-2 py-2 text-left text-sm"
+                    onClick={() =>
+                      setPickedRoleIds((cur) => (on ? cur.filter((id) => id !== r.id) : [...cur, r.id]))
+                    }
+                  >
+                    <span
+                      className={cn(
+                        "flex size-5 shrink-0 items-center justify-center rounded-full border",
+                        on ? "border-primary" : "border-line",
+                      )}
+                    >
+                      {on ? <span className="size-2.5 rounded-full bg-primary" /> : null}
+                    </span>
+                    <span className="min-w-0 truncate">{r.name || "未命名"}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <Btn variant="ghost" disabled={busy === "apply"} onClick={() => setPending(null)}>
+              取消
+            </Btn>
+            <Btn disabled={busy === "apply"} onClick={() => void confirmImport()}>
+              {busy === "apply" ? "导入中…" : "确认导入"}
+            </Btn>
+          </div>
+        </div>
+      ) : null}
+      <div className="mt-4 rounded-2xl bg-paper-2 p-4">
+        <div className="text-sm font-medium">Grok</div>
+        <p className="mt-1 text-xs leading-5 text-muted">
+          已使用当前 Grok 会员账号，无需再登录。可在设定页或聊天顶栏切换 4.5 专家 / 4.5 快速 / 4.6 / 4.3。
+        </p>
+      </div>
+      <div className="mt-5">
+        <div className="mb-2 flex items-center justify-between text-sm">
+          <span className="font-medium">NAI 中转站 API Key</span>
+          {connection.naiKey ? (
+            <span className="flex items-center gap-3">
+              <span className="text-xs text-ok">✓ 已连接</span>
+              <button
+                type="button"
+                className="text-xs text-muted"
+                onClick={() => {
+                  setKey("");
+                  setConnection("", base);
+                }}
+              >
+                退出
+              </button>
+            </span>
+          ) : (
+            <span className="text-xs text-muted">未连接</span>
+          )}
+        </div>
+        <TextInput
+          value={key}
+          onChange={(e) => {
+            const v = e.target.value;
+            setKey(v);
+            if (v.trim().length > 8) {
+              writeNaiBackup({ naiKey: v.trim(), naiBase: base.trim() || "https://api.idlecloud.cc" });
+            }
+          }}
+          onBlur={() => {
+            if (key.trim().length > 8) {
+              writeNaiBackup({ naiKey: key.trim(), naiBase: base.trim() || "https://api.idlecloud.cc" });
+            }
+          }}
+          placeholder="从 nai.idlecloud.cc 导出"
+          type="password"
+          autoComplete="off"
+        />
+        <p className="mt-2 text-xs leading-5 text-muted">
+          进阶档位以上可生成 Key。Key 只保存在你这台设备上。点保存后即可聊天配图和纯生图。
+        </p>
+      </div>
+      <div className="mt-4">
+        <div className="mb-2 text-sm font-medium">中转站地址</div>
+        <TextInput value={base} onChange={(e) => setBase(e.target.value)} placeholder="https://api.idlecloud.cc" />
+      </div>
+      <Btn
+        className="mt-6 w-full"
+        disabled={!!busy}
+        onClick={() => {
+          save();
+          onClose();
+        }}
+      >
+        保存
+      </Btn>
+    </Modal>
+  );
+}
+
+function RadioChoice({
+  selected,
+  onSelect,
+  label,
+}: {
+  selected: boolean;
+  onSelect: () => void;
+  label: string;
+}) {
+  return (
+    <button type="button" className="flex items-center gap-2 py-1 text-sm" onClick={onSelect}>
+      <span
+        className={cn(
+          "flex size-5 items-center justify-center rounded-full border",
+          selected ? "border-primary" : "border-line",
+        )}
+      >
+        {selected ? <span className="size-2.5 rounded-full bg-primary" /> : null}
+      </span>
+      {label}
+    </button>
+  );
+}
+

@@ -1,5 +1,5 @@
 import { unzipSync, zipSync, strToU8, strFromU8 } from "fflate";
-import type { AppDataDump, Chat, FavoriteItem, ImageParams } from "./types";
+import type { AppDataDump, Chat, FavoriteItem, FavGroup, ImageParams } from "./types";
 import { migrateFavorite } from "./presets";
 import { db, putImage } from "./idb";
 import {
@@ -12,12 +12,13 @@ import {
 import { downloadBlob, uid } from "./utils";
 
 export async function exportArchive(kind: "full" | "lite") {
-  const [chats, folders, cards, appearances, favorites, history, settingsRow] = await Promise.all([
+  const [chats, folders, cards, appearances, favorites, favGroups, history, settingsRow] = await Promise.all([
     db.chats.toArray(),
     db.folders.toArray(),
     db.cards.toArray(),
     db.appearances.toArray(),
     db.favorites.toArray(),
+    db.favGroups.toArray(),
     db.history.toArray(),
     db.kv.get("settings"),
   ]);
@@ -56,6 +57,7 @@ export async function exportArchive(kind: "full" | "lite") {
     cards,
     appearances,
     favorites,
+    favGroups,
     history,
     hasImages: kind === "full",
   };
@@ -132,13 +134,14 @@ export async function importArchive(file: File) {
     if (!dump || dump.version !== 1 || !Array.isArray(dump.chats)) throw new Error("无法识别的存档");
   }
 
-  const tables = [db.chats, db.folders, db.cards, db.appearances, db.favorites, db.history, db.images, db.kv];
+  const tables = [db.chats, db.folders, db.cards, db.appearances, db.favorites, db.favGroups, db.history, db.images, db.kv];
   await db.transaction("rw", tables, async () => {
     await db.chats.clear();
     await db.folders.clear();
     await db.cards.clear();
     await db.appearances.clear();
     await db.favorites.clear();
+    await db.favGroups.clear();
     await db.history.clear();
     await db.images.clear();
     await db.chats.bulkPut(dump.chats ?? []);
@@ -146,6 +149,7 @@ export async function importArchive(file: File) {
     await db.cards.bulkPut(dump.cards ?? []);
     await db.appearances.bulkPut(dump.appearances ?? []);
     await db.favorites.bulkPut((dump.favorites ?? []).map(migrateFavorite).filter(Boolean) as FavoriteItem[]);
+    await db.favGroups.bulkPut((dump.favGroups ?? []).filter((g) => g && typeof g.id === "string") as FavGroup[]);
     await db.history.bulkPut(dump.history ?? []);
     const prev = await db.kv.get("settings");
     const prevVal = (prev?.value as AppDataDump["settings"] | undefined) ?? undefined;

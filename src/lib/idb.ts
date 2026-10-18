@@ -4,6 +4,7 @@ import type {
   CharacterCard,
   Chat,
   FavoriteItem,
+  FavGroup,
   Folder,
   HistoryItem,
   LlmAccount,
@@ -44,6 +45,7 @@ class HuiyuDB extends Dexie {
   cards!: Table<CharacterCard, string>;
   appearances!: Table<AppearancePreset, string>;
   favorites!: Table<FavoriteItem, string>;
+  favGroups!: Table<FavGroup, string>;
   history!: Table<HistoryItem, string>;
   images!: Table<{ id: string; blob: Blob }, string>;
   kv!: Table<{ key: string; value: unknown }, string>;
@@ -59,6 +61,9 @@ class HuiyuDB extends Dexie {
       history: "id, createdAt",
       images: "id",
       kv: "key",
+    });
+    this.version(2).stores({
+      favGroups: "id, parentId, order",
     });
   }
 }
@@ -85,12 +90,13 @@ function parseLlmAccounts(raw: unknown): LlmAccount[] {
 }
 
 export async function loadAll() {
-  const [chats, folders, cards, appearances, favorites, history, settingsRow] = await Promise.all([
+  const [chats, folders, cards, appearances, favorites, favGroups, history, settingsRow] = await Promise.all([
     db.chats.toArray(),
     db.folders.toArray(),
     db.cards.toArray(),
     db.appearances.toArray(),
     db.favorites.toArray(),
+    db.favGroups.toArray(),
     db.history.toArray(),
     db.kv.get("settings"),
   ]);
@@ -120,7 +126,7 @@ export async function loadAll() {
           ? llmIdentity(String(raw.llmBase), String(raw.llmKey))
           : "",
   };
-  return { chats, folders, cards, appearances, favorites, history, settings };
+  return { chats, folders, cards, appearances, favorites, favGroups, history, settings };
 }
 
 export async function putImage(id: string, blob: Blob) {

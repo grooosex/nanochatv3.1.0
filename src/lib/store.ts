@@ -17,6 +17,7 @@ import type {
   CharacterCard,
   Chat,
   FavoriteItem,
+  FavGroup,
   Folder,
   GrokModelId,
   HistoryItem,
@@ -39,6 +40,68 @@ function orderFavorites(items: FavoriteItem[]) {
   const next = sortHistoryNewestFirst(items).map((f, i) => ({ ...f, order: i }));
   for (const f of next) void db.favorites.put(f);
   return next;
+}
+
+export function favGroupDescendants(groups: FavGroup[], id: string) {
+  const out = new Set<string>();
+  const walk = (pid: string) => {
+    for (const g of groups) {
+      if (g.parentId === pid && !out.has(g.id)) {
+        out.add(g.id);
+        walk(g.id);
+      }
+    }
+  };
+  walk(id);
+  return out;
+}
+
+export function countFavsInGroup(groups: FavGroup[], favs: FavoriteItem[], id: string): number {
+  let n = favs.filter((f) => f.groupId === id).length;
+  for (const g of groups) if (g.parentId === id) n += countFavsInGroup(groups, favs, g.id);
+  return n;
+}
+
+function tidyFavTree(groups: FavGroup[], favs: FavoriteItem[]) {
+  const byId = new Map(groups.map((g) => [g.id, g]));
+  const cleanGroups = groups.map((g) => {
+    let parentId = g.parentId && byId.has(g.parentId) && g.parentId !== g.id ? g.parentId : null;
+    const seen = new Set<string>([g.id]);
+    let p = parentId;
+    while (p) {
+      if (seen.has(p) || !byId.has(p)) {
+        parentId = null;
+        break;
+      }
+      seen.add(p);
+      p = byId.get(p)?.parentId ?? null;
+    }
+    return {
+      ...g,
+      name: g.name || "未命名",
+      parentId,
+      collapsed: g.collapsed !== false,
+      order: typeof g.order === "number" ? g.order : 0,
+      starred: g.starred === true,
+    };
+  });
+  const ids = new Set(cleanGroups.map((g) => g.id));
+  return {
+    favGroups: cleanGroups,
+    favorites: favs.map((f) => ({ ...f, groupId: f.groupId && ids.has(f.groupId) ? f.groupId : null })),
+  };
+}
+
+function openFavAncestors(groups: FavGroup[], id: string | null) {
+  if (!id) return groups;
+  const byId = new Map(groups.map((g) => [g.id, g]));
+  const open = new Set<string>();
+  let p: string | null = id;
+  while (p) {
+    open.add(p);
+    p = byId.get(p)?.parentId ?? null;
+  }
+  return groups.map((g) => (open.has(g.id) ? { ...g, collapsed: false } : g));
 }
 
 function copyRoleBody(dst: Character, src: Character): Character {
@@ -107,6 +170,7 @@ interface State {
   cards: CharacterCard[];
   appearances: AppearancePreset[];
   favorites: FavoriteItem[];
+  favGroups: FavGroup[];
   history: HistoryItem[];
   pureParams: ImageParams;
   currentId: string | null;
@@ -151,6 +215,15 @@ interface State {
   patchFavorite: (id: string, p: Partial<FavoriteItem>) => void;
   deleteFavorite: (id: string) => void;
   reorderFavorites: (ids: string[]) => void;
+  setFavOrders: (groupOrders: Record<string, number>, favOrders: Record<string, number>) => void;
+  addFavGroup: (name: string) => void;
+  renameFavGroup: (id: string, name: string) => void;
+  toggleFavGroup: (id: string) => void;
+  deleteFavGroup: (id: string) => void;
+  moveFavorite: (id: string, groupId: string | null) => void;
+  moveFavGroup: (id: string, parentId: string | null) => void;
+  toggleFavoriteStar: (id: string) => void;
+  toggleFavGroupStar: (id: string) => void;
   setFavoriteThumb: (id: string, blobId: string) => void;
   addHistory: (h: HistoryItem) => void;
   patchHistory: (id: string, p: Partial<HistoryItem>) => void;
@@ -204,6 +277,7 @@ export const useApp = create<State>((set, get) => ({
   cards: [],
   appearances: [],
   favorites: [],
+  favGroups: [],
   history: [],
   pureParams: defaultPureParams(),
   currentId: null,
@@ -246,12 +320,15 @@ export const useApp = create<State>((set, get) => ({
     if (!settings.imageModelId && !settings.imageModelPin && (lifted.imageModelId || lifted.imageModelPin)) {
       void db.kv.put({ key: "settings", value: nextSettings });
     }
+    const favs = orderFavorites((data.favorites ?? []).map(migrateFavorite).filter(Boolean) as FavoriteItem[]);
+    const tree = tidyFavTree(data.favGroups ?? [], favs);
     set({
       ready: true,
       ...data,
       settings: nextSettings,
       chats: live,
-      favorites: orderFavorites((data.favorites ?? []).map(migrateFavorite).filter(Boolean) as FavoriteItem[]),
+      favorites: tree.favorites,
+      favGroups: tree.favGroups,
       pureParams: normalizePureParams((pureRow?.value as ImageParams) ?? defaultPureParams()),
       currentId,
       history: sortHistoryNewestFirst(data.history ?? []),
@@ -718,14 +795,17 @@ export const useApp = create<State>((set, get) => ({
           return p;
         })();
     const list = get().favorites;
-    const top = list.reduce((m, f) => Math.min(m, f.order ?? 0), 0);
+    const loose = list.filter((f) => !f.groupId);
+    const top = loose.reduce((m, f) => Math.min(m, f.order ?? 0), 0);
     const f: FavoriteItem = {
       id: uid("fav_"),
       name: presetNameFrom(params),
       params,
       blobId,
       createdAt: Date.now(),
-      order: list.length ? top - 1 : 0,
+      groupId: null,
+      starred: false,
+      order: loose.length ? top - 1 : 0,
     };
     void (async () => {
       try {
@@ -767,6 +847,124 @@ export const useApp = create<State>((set, get) => ({
     const next = sortFavorites(get().favorites.map((f) => (rank.has(f.id) ? { ...f, order: rank.get(f.id)! } : f)));
     set({ favorites: next });
     for (const f of next) void db.favorites.put(f);
+  },
+
+  setFavOrders: (groupOrders, favOrders) => {
+    set((s) => {
+      const favGroups = s.favGroups.map((g) => {
+        if (!(g.id in groupOrders) || groupOrders[g.id] === g.order) return g;
+        const next = { ...g, order: groupOrders[g.id] };
+        void db.favGroups.put(next);
+        return next;
+      });
+      const favorites = sortFavorites(
+        s.favorites.map((f) => {
+          if (!(f.id in favOrders) || favOrders[f.id] === (f.order ?? 0)) return f;
+          const next = { ...f, order: favOrders[f.id] };
+          void db.favorites.put(next);
+          return next;
+        }),
+      );
+      return { favGroups, favorites };
+    });
+  },
+
+  addFavGroup: (name) => {
+    const title = name.trim() || "未命名";
+    const roots = get().favGroups.filter((g) => !g.parentId);
+    const top = roots.reduce((m, g) => Math.min(m, g.order), 0);
+    const row: FavGroup = {
+      id: uid("fg_"),
+      name: title,
+      parentId: null,
+      collapsed: true,
+      order: roots.length ? top - 1 : 0,
+      starred: false,
+      createdAt: Date.now(),
+    };
+    void db.favGroups.put(row);
+    set((s) => ({ favGroups: [row, ...s.favGroups] }));
+  },
+
+  renameFavGroup: (id, name) => {
+    const row = get().favGroups.find((g) => g.id === id);
+    if (!row) return;
+    const next = { ...row, name: name.trim() || "未命名" };
+    void db.favGroups.put(next);
+    set((s) => ({ favGroups: s.favGroups.map((g) => (g.id === id ? next : g)) }));
+  },
+
+  toggleFavGroup: (id) => {
+    const row = get().favGroups.find((g) => g.id === id);
+    if (!row) return;
+    const next = { ...row, collapsed: !row.collapsed };
+    void db.favGroups.put(next);
+    set((s) => ({ favGroups: s.favGroups.map((g) => (g.id === id ? next : g)) }));
+  },
+
+  deleteFavGroup: (id) => {
+    const dropG = new Set<string>([id, ...favGroupDescendants(get().favGroups, id)]);
+    const dropF = get().favorites.filter((f) => f.groupId && dropG.has(f.groupId));
+    set((s) => ({
+      favGroups: s.favGroups.filter((g) => !dropG.has(g.id)),
+      favorites: s.favorites.filter((f) => !(f.groupId && dropG.has(f.groupId))),
+    }));
+    for (const gid of dropG) void db.favGroups.delete(gid);
+    for (const f of dropF) {
+      void db.favorites.delete(f.id);
+      if (f.blobId && !blobInUse(get(), f.blobId)) void deleteImage(f.blobId);
+    }
+    get().toast("已删除");
+  },
+
+  moveFavorite: (id, groupId) => {
+    const favs = get().favorites;
+    const row = favs.find((f) => f.id === id);
+    if (!row) return;
+    if (groupId && !get().favGroups.some((g) => g.id === groupId)) return;
+    const sib = favs.filter((f) => f.id !== id && (f.groupId ?? null) === groupId);
+    const top = sib.reduce((m, f) => Math.min(m, f.order ?? 0), 0);
+    const groups = openFavAncestors(get().favGroups, groupId);
+    if (groups !== get().favGroups) {
+      set({ favGroups: groups });
+      for (const g of groups) if (!g.collapsed) void db.favGroups.put(g);
+    }
+    get().patchFavorite(id, { groupId, order: sib.length ? top - 1 : 0 });
+  },
+
+  moveFavGroup: (id, parentId) => {
+    const groups = get().favGroups;
+    const row = groups.find((g) => g.id === id);
+    if (!row) return;
+    if (parentId) {
+      if (parentId === id || favGroupDescendants(groups, id).has(parentId)) return;
+      if (!groups.some((g) => g.id === parentId)) return;
+    }
+    const sib = groups.filter((g) => g.id !== id && (g.parentId ?? null) === parentId);
+    const top = sib.reduce((m, g) => Math.min(m, g.order), 0);
+    const moved = { ...row, parentId, order: sib.length ? top - 1 : 0 };
+    const next = openFavAncestors(
+      groups.map((g) => (g.id === id ? moved : g)),
+      parentId,
+    );
+    set({ favGroups: next });
+    for (const g of next) void db.favGroups.put(g);
+  },
+
+  toggleFavoriteStar: (id) => {
+    const row = get().favorites.find((f) => f.id === id);
+    if (!row) return;
+    const next = { ...row, starred: !row.starred };
+    void db.favorites.put(next);
+    set((s) => ({ favorites: s.favorites.map((f) => (f.id === id ? next : f)) }));
+  },
+
+  toggleFavGroupStar: (id) => {
+    const row = get().favGroups.find((g) => g.id === id);
+    if (!row) return;
+    const next = { ...row, starred: !row.starred };
+    void db.favGroups.put(next);
+    set((s) => ({ favGroups: s.favGroups.map((g) => (g.id === id ? next : g)) }));
   },
 
   setFavoriteThumb: (id, blobId) => {

@@ -202,6 +202,16 @@ export interface AppearancePreset {
   createdAt: number;
 }
 
+export interface FavGroup {
+  id: string;
+  name: string;
+  parentId: string | null;
+  collapsed: boolean;
+  order: number;
+  starred?: boolean;
+  createdAt: number;
+}
+
 export interface FavoriteItem {
   id: string;
   name: string;
@@ -209,6 +219,8 @@ export interface FavoriteItem {
   blobId?: string;
   createdAt: number;
   order?: number;
+  groupId?: string | null;
+  starred?: boolean;
 }
 
 export interface HistoryItem {
@@ -290,6 +302,10 @@ export interface Settings {
   /** Last explicit API pick for 配图 AI; kept at the end of the list on Grok. */
   imageModelPin?: string | null;
   theme: "light" | "dark";
+  /** 纯生图收藏是否用缩略图。关掉收藏再打开仍保持。 */
+  favThumbs?: boolean;
+  /** 纯生图角色栏锁定。收藏/历史应用参数时不覆盖角色。 */
+  pureCharLocked?: boolean;
 }
 
 export interface AppDataDump {
@@ -300,6 +316,7 @@ export interface AppDataDump {
   cards: CharacterCard[];
   appearances: AppearancePreset[];
   favorites: FavoriteItem[];
+  favGroups?: FavGroup[];
   history: HistoryItem[];
   hasImages: boolean;
 }

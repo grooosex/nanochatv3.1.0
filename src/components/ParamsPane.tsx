@@ -79,6 +79,7 @@ export function ParamsPane({ chat, mode = "chat" }: { chat: Chat; mode?: "chat" 
   const v3 = family === "v3";
   const hideSplit = mode === "pure" && p.merged;
   const jump = useApp((s) => s.ui.paramsJump);
+  const charLocked = useApp((s) => s.settings.pureCharLocked === true);
   const previewOpen = useApp((s) => s.ui.previewParams);
   const previewRef = useRef<HTMLDivElement>(null);
   const chatId = chat.id;
@@ -406,7 +407,19 @@ export function ParamsPane({ chat, mode = "chat" }: { chat: Chat; mode?: "chat" 
 
       {!v3 && (
         <div className="mb-8 mt-4" data-section="chars">
-          <div className="text-[15px] font-medium">角色提示词 (V4 / V5)</div>
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-[15px] font-medium">角色提示词 (V4 / V5)</div>
+            {mode === "pure" && (
+              <button
+                type="button"
+                className={`grid size-9 shrink-0 place-items-center ${charLocked ? "text-primary" : "text-muted"}`}
+                onClick={() => useApp.getState().setSettings({ pureCharLocked: !charLocked })}
+                aria-label="锁定角色"
+              >
+                <Lock className="size-4" />
+              </button>
+            )}
+          </div>
           <div className="mb-2 text-[11px] text-muted">每个角色独立提示。AI 决定位置时忽略坐标。</div>
           <div className="mb-3 flex rounded-full bg-dim p-1 text-[13px]">
             <button

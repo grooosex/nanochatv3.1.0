@@ -1,18 +1,20 @@
 import { grokOnce, grokStream } from "./grok-client";
 import { chatContextBlock, fieldPolishHint, groupFormatHint, IMAGE_BG_RULES, IMAGE_MULTI_RULES, IMAGE_SHOT_RULES, imageApplyRules, imageLengthRules, imageWriteMaxTokens, multiInsertInstruction, roleSnapshot, splitChatPrompt, statusBarFor, voicePolishExtra } from "./prompts";
 import { buildPolishUserContent, extractFieldText, parsePolishJson, stripRoleOutput } from "./role-polish";
-import { formatUserForChat, standingDirectives } from "./user-markup";
+import { formatUserForChat, formatUserImageTurn, standingDirectives } from "./user-markup";
 import { stripSpeakerPrefix } from "./rp-text";
 import { replyContextText } from "./reply-markup.ts";
 import { resolveImageWrite, imageWriteFields } from "./image-ai.ts";
 import { buildIdlecloudBody, buildNaiPayload } from "./nai";
 import { sanitizeNaiTags, assignCharTags, extractJsonObject, resolveAbsentIds, presenceFromTags, legacyPresentIds } from "./nai-tags";
 import { IMAGE_DRAW_TIMEOUT_MS, IMAGE_GEN_TIMEOUT_MS, NAI_HOP_TIMEOUT_MS, NAI_POLL_MS, RECENT_TURNS } from "./constants";
+import { getImage } from "./idb";
 import { saveBlob, useApp } from "./store";
 import { presetStyle } from "./st-preset";
 import type { Chat, ChatMessage, GenImage, GrokModelId } from "./types";
 import { randomSeed, uid } from "./utils";
 import { imageFailText } from "./image-status";
+import { blobDataUrl, blobRawB64 } from "./ref-image";
 import {
   clipMemoryText,
   foldIntervalMessages,
@@ -28,6 +30,60 @@ export function stripStatus(text: string) {
   return { body: text.slice(0, i).trim(), status: text.slice(i).trim() };
 }
 
+type VisionPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
+export async function decorateVision<T extends { role: string; content: string }>(chat: Chat, msgs: T[]): Promise<(Omit<T, "content"> & { content: string | VisionPart[] })[]> {
+  let last = -1;
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    if (msgs[i].role === "user") last = i;
+  }
+  if (last < 0) return msgs;
+  const windowMsgs = chat.messages.slice(0, chat.messages.length);
+  const start = Math.max(0, windowMsgs.length - recentWindow());
+  const recent = windowMsgs.slice(start);
+  let src: ChatMessage | undefined;
+  for (let i = recent.length - 1; i >= 0; i--) {
+    if (recent[i].role === "user") {
+      src = recent[i];
+      break;
+    }
+  }
+  const parts: VisionPart[] = [{ type: "text", text: msgs[last].content }];
+  let added = false;
+  if (src?.userImageBlobId) {
+    const url = await blobDataUrl(src.userImageBlobId);
+    if (url) {
+      parts.push({
+        type: "text",
+        text: "下面这张就是用户这一轮发来的图，也就是现在的画面。用户的字是对着这张图说的。不要把它当成外貌备忘，也不要沿用上一拍的旧动作。",
+      });
+      parts.push({ type: "image_url", image_url: { url } });
+      added = true;
+    }
+  }
+  for (const c of chat.characters) {
+    if (!c.lookBlobId) continue;
+    const url = await blobDataUrl(c.lookBlobId);
+    if (!url) continue;
+    const name = c.name.trim() || "角色";
+    parts.push({
+      type: "text",
+      text: `下面这张是${name}的外貌备忘，不是用户这轮发来的图，也不是现在的剧情画面。人设里「外貌备忘」写的就是她；这张图是那一栏的样子，用来认长相、发色瞳色、体型和衣服。剧情里已经换过的衣服或发型，以剧情为准，不要被这张图改回去。`,
+    });
+    parts.push({ type: "image_url", image_url: { url } });
+    added = true;
+  }
+  if (!added) return msgs;
+  return msgs.map((m, i) => (i === last ? { ...m, content: parts } : m));
+}
+
+function clampUnit(n: number, min: number, max: number) {
+  if (!Number.isFinite(n)) return min;
+  return Math.min(max, Math.max(min, n));
+}
+
 export function recentWindow() {
   const s = useApp.getState().settings;
   const turns = s.chatSource === "api" ? Math.max(4, s.llmParams.contextTurns) : RECENT_TURNS;
@@ -38,6 +94,12 @@ export function foldWindow() {
   const s = useApp.getState().settings;
   const turns = s.chatSource === "api" ? Math.max(4, s.llmParams.contextTurns) : RECENT_TURNS;
   return { W: turns * 2, I: foldIntervalMessages(turns) };
+}
+
+function userHistoryContent(m: ChatMessage, last: boolean, standing: string[]) {
+  if (m.userImageBlobId && last) return formatUserImageTurn(m.content, standing);
+  if (m.userImageBlobId && !m.content.trim()) return "用户那一轮发过一张图，没有写字。那一轮已经过去。";
+  return formatUserForChat(m.content, standing);
 }
 
 function historyMessages(chat: Chat, upto?: number) {
@@ -56,7 +118,7 @@ function historyMessages(chat: Chat, upto?: number) {
       role: m.role === "user" ? ("user" as const) : ("assistant" as const),
       content:
         m.role === "user"
-          ? formatUserForChat(m.content, i === lastUser ? standing : [])
+          ? userHistoryContent(m, i === lastUser, i === lastUser ? standing : [])
           : stripSpeakerPrefix(replyContextText(m.content), [
               m.characterName,
               chat.name,
@@ -379,6 +441,7 @@ export async function generateNai(opts: {
   seed?: number;
   apiKey: string;
   baseUrl: string;
+  turnImageBlobId?: string;
   onStart?: () => void;
   onReceiving?: () => void;
   signal?: AbortSignal;
@@ -390,7 +453,19 @@ export async function generateNai(opts: {
     insertMode: opts.chat.promptMode,
     seed: opts.seed,
   });
-  const payload = buildIdlecloudBody(built, opts.chat.imageParams, opts.chat.promptMode);
+  const blobId = opts.chat.imageParams.img2imgBlobId || opts.turnImageBlobId || "";
+  let img2img: { image: string; strength: number; noise: number } | undefined;
+  if (blobId) {
+    const blob = await getImage(blobId);
+    if (blob) {
+      img2img = {
+        image: await blobRawB64(blob),
+        strength: clampUnit(opts.chat.imageParams.img2imgStrength ?? 0.7, 0.01, 0.99),
+        noise: clampUnit(opts.chat.imageParams.img2imgNoise ?? 0, 0, 0.99),
+      };
+    }
+  }
+  const payload = buildIdlecloudBody(built, opts.chat.imageParams, opts.chat.promptMode, img2img);
   opts.onStart?.();
   const finish = async (b64: string) => {
     opts.onReceiving?.();

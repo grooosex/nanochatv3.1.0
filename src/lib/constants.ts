@@ -17,6 +17,9 @@ export const GROK_MODELS: {
   model: string;
   effort: "low" | "medium" | "high";
 }[] = [
+  { id: "grok-4.7-medium", label: "4.7 均衡", short: "4.7 均衡", model: "grok-4.7", effort: "medium" },
+  { id: "grok-4.7-high", label: "4.7 专家", short: "4.7 专家", model: "grok-4.7", effort: "high" },
+  { id: "grok-4.7-low", label: "4.7 快速", short: "4.7 快速", model: "grok-4.7", effort: "low" },
   { id: "grok-4.6-medium", label: "4.6 均衡", short: "4.6 均衡", model: "grok-4.6", effort: "medium" },
   { id: "grok-4.6-high", label: "4.6 专家", short: "4.6 专家", model: "grok-4.6", effort: "high" },
   { id: "grok-4.6-low", label: "4.6 快速", short: "4.6 快速", model: "grok-4.6", effort: "low" },
@@ -29,6 +32,7 @@ export const DEFAULT_GROK: GrokModelId = "grok-4.6-medium";
 
 export function migrateGrokId(id: string | undefined | null): GrokModelId {
   if (id && GROK_MODELS.some((m) => m.id === id)) return id as GrokModelId;
+  if (id === "grok-4.7" || id === "grok-4-7") return "grok-4.7-medium";
   if (id === "grok-4.6" || id === "grok-4-6") return "grok-4.6-medium";
   if (id === "grok-4.5") return "grok-4.5-medium";
   if (id === "grok-4.5-fast" || id === "grok-4.3" || id === "grok-4.3-low") return "grok-4.5-low";

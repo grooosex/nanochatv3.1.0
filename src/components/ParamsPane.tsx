@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Download, Folder as FolderIcon, Lock, Plus, Star, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Folder as FolderIcon, Lock, Plus, Star, Trash2, Upload } from "lucide-react";
 import {
   joinPromptParts,
   NAI_MODELS,
@@ -9,7 +9,9 @@ import {
   UC,
 } from "@/lib/constants";
 import { applyBackFlags, applyFrontFlags, applyMergedFlags } from "@/lib/prompt-flags";
-import { listedChats, useApp } from "@/lib/store";
+import { listedChats, saveBlob, useApp } from "@/lib/store";
+import { compressRef, naiSeedOf } from "@/lib/ref-image";
+import { imageUrl } from "@/lib/idb";
 import { insertTag, loadTags, suggestTags, type Tag } from "@/lib/tags";
 import { naiFamily } from "@/lib/nai";
 import { replyStoryText } from "@/lib/reply-markup";
@@ -22,7 +24,7 @@ import {
 import type { AppearancePreset, Chat, CharacterPrompt, ImageParams, NaiModelId, NoiseSchedule, SamplerId, UcPreset } from "@/lib/types";
 import { cn, randomSeed, uid } from "@/lib/utils";
 import { LibraryDrawer } from "./LibraryDrawer";
-import { Card, ChatAvatar, ExpandSelect, Slider, Switch, TextArea } from "./ui-kit";
+import { Card, ChatAvatar, ExpandSelect, Slider, Switch, TextArea, ZoomImg } from "./ui-kit";
 
 function scrollJump(jump: string) {
   const el = document.querySelector(`[data-section="${jump}"]`) as HTMLElement | null;
@@ -190,7 +192,12 @@ export function ParamsPane({ chat, mode = "chat" }: { chat: Chat; mode?: "chat" 
                 const src = useApp.getState().chats.find((c) => c.id === id);
                 if (!src) return;
                 const { characters: _c, useCoords: _u, ...rest } = structuredClone(src.imageParams);
-                useApp.getState().patchParams(chatId, rest);
+                useApp.getState().patchParams(chatId, {
+                  ...rest,
+                  img2imgBlobId: rest.img2imgBlobId || "",
+                  img2imgStrength: rest.img2imgStrength ?? 0.7,
+                  img2imgNoise: rest.img2imgNoise ?? 0,
+                });
                 setPeek(null);
                 useApp.getState().setUI({ previewParams: false });
                 useApp.getState().toast("已套用参数");
@@ -316,6 +323,24 @@ export function ParamsPane({ chat, mode = "chat" }: { chat: Chat; mode?: "chat" 
           menu="end"
         />
       </div>
+      <Img2ImgBox
+        blobId={p.img2imgBlobId}
+        strength={p.img2imgStrength ?? 0.7}
+        noise={p.img2imgNoise ?? 0}
+        onFile={async (file) => {
+          const seed = await naiSeedOf(file);
+          const blob = await compressRef(file, 1216, 0.9);
+          const id = await saveBlob(blob);
+          const next: Partial<ImageParams> = { img2imgBlobId: id };
+          if (p.img2imgStrength == null) next.img2imgStrength = 0.7;
+          if (p.img2imgNoise == null) next.img2imgNoise = 0;
+          if (seed != null) next.seed = seed;
+          commit(next);
+        }}
+        onClear={() => commit({ img2imgBlobId: "" })}
+        onStrength={(n) => commit({ img2imgStrength: n })}
+        onNoise={(n) => commit({ img2imgNoise: n })}
+      />
       <div className="mb-3 flex items-center gap-2" data-section="sampler">
         <div className="flex min-w-0 flex-1 items-center gap-1">
           <div className="shrink-0 text-[13px] font-medium">采样器</div>
@@ -864,6 +889,104 @@ function PromptBox({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function Img2ImgBox({
+  blobId,
+  strength,
+  noise,
+  onFile,
+  onClear,
+  onStrength,
+  onNoise,
+}: {
+  blobId?: string;
+  strength: number;
+  noise: number;
+  onFile: (file: File) => void;
+  onClear: () => void;
+  onStrength: (n: number) => void;
+  onNoise: (n: number) => void;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  const [over, setOver] = useState(false);
+  useEffect(() => {
+    if (!blobId) {
+      setUrl(null);
+      return;
+    }
+    let dead = false;
+    void imageUrl(blobId).then((u) => {
+      if (!dead) setUrl(u);
+    });
+    return () => {
+      dead = true;
+    };
+  }, [blobId]);
+  const take = (file?: File) => {
+    if (file && (!file.type || file.type.startsWith("image/"))) onFile(file);
+  };
+  return (
+    <div className="mb-4" data-section="img2img">
+      <div className="mb-2 text-[13px] font-medium">图生图</div>
+      {blobId ? (
+        <>
+          <div className="relative overflow-hidden rounded-[16px] border border-line bg-dim">
+            {url ? <ZoomImg src={url} className="max-h-64 w-full object-contain" /> : <div className="h-36 w-full bg-dim" />}
+            <button
+              type="button"
+              className="absolute right-2 top-2 z-10 grid size-8 place-items-center rounded-full bg-card/90 text-ink"
+              aria-label="删除底图"
+              onClick={onClear}
+            >
+              <Trash2 className="size-4" />
+            </button>
+          </div>
+          <div className="mb-1 mt-3 text-[13px] font-medium">图生图调整</div>
+          <div className="mb-1 flex items-center justify-between text-[13px]">
+            <span>强度</span>
+            <span className="tabular-nums text-muted">{strength.toFixed(2)}</span>
+          </div>
+          <Slider value={strength} min={0.01} max={0.99} step={0.01} onChange={onStrength} />
+          <div className="mb-1 mt-3 flex items-center justify-between text-[13px]">
+            <span>噪声</span>
+            <span className="tabular-nums text-muted">{noise.toFixed(2)}</span>
+          </div>
+          <Slider value={noise} min={0} max={0.99} step={0.01} onChange={onNoise} />
+        </>
+      ) : (
+        <button
+          type="button"
+          className={`flex h-36 w-full flex-col items-center justify-center gap-2 rounded-[16px] border border-dashed text-[13px] text-muted ${over ? "border-primary bg-dim" : "border-line"}`}
+          onClick={() => input.current?.click()}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setOver(true);
+          }}
+          onDragLeave={() => setOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setOver(false);
+            take(e.dataTransfer.files?.[0]);
+          }}
+        >
+          <Upload className="size-5" />
+          点击或将图像拖放到此处
+        </button>
+      )}
+      <input
+        ref={input}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          take(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
     </div>
   );
 }

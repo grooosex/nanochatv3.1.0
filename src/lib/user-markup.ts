@@ -94,6 +94,18 @@ export function formatUserForChat(raw: string, standing: string[] = []): string 
   return parts.join("\n\n");
 }
 
+export function formatUserImageTurn(raw: string, standing: string[] = []): string {
+  const t = (raw || "").trim();
+  if (!t) {
+    const frame =
+      "用户这轮发来一张图，没有写字。图就在这条消息后面。这张图就是现在正在发生的画面：她在做什么、什么姿势、在什么地方，都认这张图。看着这张图回复，不要当成没说话，也不要沿用上一拍自己推进剧情。";
+    const extra = standing.map((s) => s.trim()).filter(Boolean);
+    return extra.length ? `${frame}\n\n${chatAuthorBlock(extra)}` : frame;
+  }
+  const body = formatUserForChat(t, standing);
+  return `${body}\n\n用户这轮还发来一张图，图就在这条消息后面。上面的字是对着这张图说的。这张图就是现在的画面，不要沿用上一拍的旧动作。她听见的话也是在问或说这张图里的事。`;
+}
+
 export function formatUserForImage(raw: string, standing: string[] = []): string {
   const extra = standing.map((s) => s.trim()).filter(Boolean);
   const t = (raw || "").trim();

@@ -490,6 +490,8 @@ function characterBlock(c: Character, idx: number) {
     c.persona && `人设：${c.persona}`,
     c.speech && `说话方式：${c.speech}`,
     c.appearance && `外貌备忘（给正文校对用，不是生图底）：${c.appearance}`,
+    c.lookBlobId &&
+      `外貌备忘的图：这条消息后面附有一张${c.name.trim() || "她"}的图，就是这份外貌备忘的样子，用来认长相、发色瞳色、体型和衣服。不是用户发来的照片，也不是当前画面。剧情里已经换过的衣服或发型，以剧情为准。`,
   ]
     .filter(Boolean)
     .join("\n");

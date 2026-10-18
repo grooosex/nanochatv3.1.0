@@ -270,6 +270,21 @@ var Ellipsis = createLucideIcon("ellipsis", [
 * This source code is licensed under the ISC license.
 * See the LICENSE file in the root directory of this source tree.
 */
+var Eye = createLucideIcon("eye", [["path", {
+	d: "M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0",
+	key: "1nclc0"
+}], ["circle", {
+	cx: "12",
+	cy: "12",
+	r: "3",
+	key: "1v7zrd"
+}]]);
+/**
+* @license lucide-react v0.510.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
 var FileUp = createLucideIcon("file-up", [
 	["path", {
 		d: "M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z",
@@ -812,4 +827,4 @@ var X = createLucideIcon("x", [["path", {
 	key: "d8bk6v"
 }]]);
 //#endregion
-export { ChevronLeft as A, FileUp as C, Clock as D, Copy as E, ArrowDown as F, AlignJustify as I, Check as M, Bookmark as N, ChevronUp as O, ArrowUp as P, FolderInput as S, Download as T, Lock as _, Trash2 as a, Folder as b, Sparkles as c, ScanSearch as d, RefreshCw as f, Menu as g, Moon as h, TriangleAlert as i, ChevronDown as j, ChevronRight as k, SlidersHorizontal as l, Pencil as m, WandSparkles as n, Sun as o, Plus as p, Upload as r, Star as s, X as t, Settings as u, LoaderCircle as v, Ellipsis as w, FolderPlus as x, GitBranch as y };
+export { ChevronRight as A, FileUp as C, Copy as D, Download as E, ArrowUp as F, ArrowDown as I, AlignJustify as L, ChevronDown as M, Check as N, Clock as O, Bookmark as P, FolderInput as S, Ellipsis as T, Lock as _, Trash2 as a, Folder as b, Sparkles as c, ScanSearch as d, RefreshCw as f, Menu as g, Moon as h, TriangleAlert as i, ChevronLeft as j, ChevronUp as k, SlidersHorizontal as l, Pencil as m, WandSparkles as n, Sun as o, Plus as p, Upload as r, Star as s, X as t, Settings as u, LoaderCircle as v, Eye as w, FolderPlus as x, GitBranch as y };

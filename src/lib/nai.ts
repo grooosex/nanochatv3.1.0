@@ -161,6 +161,7 @@ export function buildIdlecloudBody(
   built: ReturnType<typeof buildNaiPayload>,
   params: ImageParams,
   insertMode: "insert" | "legacy" = "insert",
+  img2img?: { image: string; strength: number; noise: number },
 ) {
   const body: Record<string, unknown> = {
     model: built.model,
@@ -198,6 +199,12 @@ export function buildIdlecloudBody(
       char_caption: c.uc,
       centers: [{ x: c.center.x, y: c.center.y }],
     }));
+  }
+  if (img2img) {
+    body.action = true;
+    body.image = img2img.image;
+    body.strength = img2img.strength;
+    body.noise = img2img.noise;
   }
   return body;
 }

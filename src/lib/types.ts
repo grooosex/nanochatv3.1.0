@@ -1,6 +1,9 @@
 export type TabId = "chat" | "params" | "pure";
 
 export type GrokModelId =
+  | "grok-4.7-high"
+  | "grok-4.7-medium"
+  | "grok-4.7-low"
   | "grok-4.6-high"
   | "grok-4.6-medium"
   | "grok-4.6-low"
@@ -49,6 +52,7 @@ export interface Character {
   persona: string;
   speech: string;
   appearance: string;
+  lookBlobId?: string;
   extras: ExtraField[];
   personaVoices?: boolean;
   imageEnabled: boolean;
@@ -86,6 +90,9 @@ export interface ImageParams {
   decrisper: boolean;
   useCoords: boolean;
   characters: CharacterPrompt[];
+  img2imgBlobId?: string;
+  img2imgStrength?: number;
+  img2imgNoise?: number;
 }
 
 export interface CharacterPrompt {
@@ -126,6 +133,8 @@ export interface ChatMessage {
   content: string;
   images: GenImage[];
   createdAt: number;
+  userImageBlobId?: string;
+  userImageI2i?: boolean;
 }
 
 export interface MemorySnap {

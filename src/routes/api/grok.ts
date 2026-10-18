@@ -2,6 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { systemFor } from "@/lib/prompts";
 
 const GROK_MODELS: Record<string, { model: string; effort: string }> = {
+  "grok-4.7-high": { model: "grok-4.7", effort: "high" },
+  "grok-4.7-medium": { model: "grok-4.7", effort: "medium" },
+  "grok-4.7-low": { model: "grok-4.7", effort: "low" },
   "grok-4.6-high": { model: "grok-4.6", effort: "high" },
   "grok-4.6-medium": { model: "grok-4.6", effort: "medium" },
   "grok-4.6-low": { model: "grok-4.6", effort: "low" },
@@ -10,7 +13,7 @@ const GROK_MODELS: Record<string, { model: string; effort: string }> = {
   "grok-4.5-low": { model: "grok-4.5", effort: "low" },
 };
 
-type Msg = { role: "system" | "user" | "assistant"; content: string };
+type Msg = { role: "system" | "user" | "assistant"; content: string | object };
 
 function pickModel(id: string | undefined) {
   return GROK_MODELS[id || ""] ?? GROK_MODELS["grok-4.6-medium"];

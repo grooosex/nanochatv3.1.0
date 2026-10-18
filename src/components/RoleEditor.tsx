@@ -4,14 +4,16 @@ import { DEFAULT_STATUS_BAR, PLACEHOLDERS, emptyCharacter } from "@/lib/constant
 import { polishAll, polishField, foldWindow } from "@/lib/engine";
 import { FIELD_LABELS } from "@/lib/prompts";
 import { applyRoleField, mergePolish } from "@/lib/role-polish";
-import { useApp } from "@/lib/store";
+import { useApp, saveBlob } from "@/lib/store";
+import { compressRef } from "@/lib/ref-image";
+import { imageUrl } from "@/lib/idb";
 import { syncCharsFromRole } from "@/lib/nai";
 import type { Chat, ExtraField } from "@/lib/types";
 import { uid } from "@/lib/utils";
 import { emptyMemory, foldCoveredEnd, memoryCaughtUp, memoryTurnStats } from "@/lib/chat-memory";
 import { invalidateMemory, runManualMemory } from "./chat-actions";
 import { ChatModelSelect } from "./ModelSelect";
-import { Card, ExpandSelect, FieldLabel, GhostBtn, Modal, PrimaryBtn, Switch, TextArea, TextInput } from "./ui-kit";
+import { Card, ExpandSelect, FieldLabel, GhostBtn, Modal, PrimaryBtn, Switch, TextArea, TextInput, ZoomImg } from "./ui-kit";
 import { LibraryDrawer } from "./LibraryDrawer";
 
 type Busy =
@@ -345,6 +347,21 @@ export function RoleEditor({ chat, mode }: { chat: Chat; mode: "create" | "edit"
             }
             onRegen={() => runField("speech", char.id)}
             onPersonal={() => openPersonalize("speech", char.id)}
+          />
+          <LookRef
+            blobId={char.lookBlobId}
+            onPick={async (file) => {
+              const blob = await compressRef(file, 768, 0.82);
+              const id = await saveBlob(blob);
+              patch({
+                characters: chat.characters.map((c) => (c.id === char.id ? { ...c, lookBlobId: id } : c)),
+              });
+            }}
+            onClear={() =>
+              patch({
+                characters: chat.characters.map((c) => (c.id === char.id ? { ...c, lookBlobId: "" } : c)),
+              })
+            }
           />
           <FieldBlock
             label="外貌备忘"
@@ -686,6 +703,70 @@ function FieldBlock({
         />
       )}
     </Card>
+  );
+}
+
+function LookRef({
+  blobId,
+  onPick,
+  onClear,
+}: {
+  blobId?: string;
+  onPick: (file: File) => void;
+  onClear: () => void;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!blobId) {
+      setUrl(null);
+      return;
+    }
+    let dead = false;
+    void imageUrl(blobId).then((u) => {
+      if (!dead) setUrl(u);
+    });
+    return () => {
+      dead = true;
+    };
+  }, [blobId]);
+  return (
+    <div className="mb-3 flex items-center gap-2 px-1">
+      {url ? (
+        <div className="relative">
+          <ZoomImg src={url} className="size-16 rounded-[12px] object-cover" />
+          <button
+            type="button"
+            className="absolute -right-1 -top-1 z-10 grid size-5 place-items-center rounded-full bg-card text-ink"
+            aria-label="去掉外貌备忘"
+            onClick={onClear}
+          >
+            <X className="size-3" />
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          className="grid size-9 place-items-center rounded-full border border-line text-muted"
+          aria-label="上传外貌备忘"
+          onClick={() => input.current?.click()}
+        >
+          <Plus className="size-4" />
+        </button>
+      )}
+      <span className="text-[12px] text-muted">外貌备忘的样子，只给聊天看</span>
+      <input
+        ref={input}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onPick(file);
+          e.target.value = "";
+        }}
+      />
+    </div>
   );
 }
 

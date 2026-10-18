@@ -1,4 +1,4 @@
-//#region node_modules/.nitro/vite/services/ssr/assets/_tanstack-start-manifest_v-BJAsL9-A.js
+//#region node_modules/.nitro/vite/services/ssr/assets/_tanstack-start-manifest_v-D2NdOaAK.js
 var tsrStartManifest = () => ({ routes: {
 	__root__: {
 		filePath: "/workspace/src/routes/__root.tsx",
@@ -8,17 +8,17 @@ var tsrStartManifest = () => ({ routes: {
 			"/api/llm",
 			"/api/nai"
 		],
-		preloads: ["/assets/index-BnWqxR9P.js"],
+		preloads: ["/assets/index-TrbtOAvy.js"],
 		scripts: [{ attrs: {
 			type: "module",
 			async: !0,
-			src: "/assets/index-BnWqxR9P.js"
+			src: "/assets/index-TrbtOAvy.js"
 		} }]
 	},
 	"/": {
 		filePath: "/workspace/src/routes/index.tsx",
 		children: void 0,
-		preloads: ["/assets/routes-BBgIxmdi.js"]
+		preloads: ["/assets/routes-DrV-19fh.js"]
 	}
 } });
 //#endregion

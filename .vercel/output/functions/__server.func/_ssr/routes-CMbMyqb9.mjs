@@ -1,13 +1,13 @@
 import { i as __toESM, n as __exportAll } from "../_runtime.mjs";
 import { d as require_react_dom, q as require_react, x as require_jsx_runtime } from "../_libs/@tanstack/react-router+[...].mjs";
 import { i as zipSync, n as strToU8, r as unzipSync, t as strFromU8 } from "../_libs/fflate.mjs";
-import { A as ChevronLeft, C as FileUp, D as Clock, E as Copy, F as ArrowDown, I as AlignJustify, M as Check, N as Bookmark, O as ChevronUp, P as ArrowUp, S as FolderInput, T as Download, _ as Lock, a as Trash2, b as Folder, c as Sparkles, d as ScanSearch, f as RefreshCw, g as Menu, h as Moon, j as ChevronDown, k as ChevronRight, l as SlidersHorizontal, m as Pencil, n as WandSparkles, o as Sun, p as Plus, r as Upload, s as Star, t as X, u as Settings, v as LoaderCircle, w as Ellipsis, x as FolderPlus, y as GitBranch } from "../_libs/lucide-react.mjs";
-import { A as NOISE_SCHEDULES, B as joinPromptParts, C as FURRY_TAG, D as NAI_HOP_TIMEOUT_MS, E as IMAGE_GEN_TIMEOUT_MS, F as UC, G as __exportAll$1, H as migrateGrokId, I as UNCENSORED_TAG, L as defaultImageParams, M as RESOLUTIONS, N as SAMPLERS, O as NAI_MODELS, P as SENSITIVE_PREFIX, R as defaultPureParams, S as FULLBODY_TAG, T as IMAGE_DRAW_TIMEOUT_MS, U as normalizePureParams, V as mergeLlmParams, W as shortModelLabel, _ as COOLDOWN_MS, a as IMAGE_SHOT_RULES, b as DEFAULT_NAI_BASE, c as fieldPolishHint, d as imageLengthRules, f as imageWriteMaxTokens, g as voicePolishExtra, h as splitChatPrompt, i as IMAGE_MULTI_RULES, j as PLACEHOLDERS, k as NAI_POLL_MS, l as groupFormatHint, m as roleSnapshot, n as FIELD_LABELS, o as chatContextBlock, p as multiInsertInstruction, r as IMAGE_BG_RULES, s as chatImageSystem, u as imageApplyRules, v as DEFAULT_GROK, w as GROK_MODELS$1, x as DEFAULT_STATUS_BAR, y as DEFAULT_LLM_PARAMS, z as emptyCharacter } from "./router-Wq2WyM9m.mjs";
+import { A as ChevronRight, C as FileUp, D as Copy, E as Download, F as ArrowUp, I as ArrowDown, L as AlignJustify, M as ChevronDown, N as Check, O as Clock, P as Bookmark, S as FolderInput, T as Ellipsis, _ as Lock, a as Trash2, b as Folder, c as Sparkles, d as ScanSearch, f as RefreshCw, g as Menu, h as Moon, j as ChevronLeft, k as ChevronUp, l as SlidersHorizontal, m as Pencil, n as WandSparkles, o as Sun, p as Plus, r as Upload, s as Star, t as X, u as Settings, v as LoaderCircle, w as Eye, x as FolderPlus, y as GitBranch } from "../_libs/lucide-react.mjs";
+import { A as NOISE_SCHEDULES, B as joinPromptParts, C as FURRY_TAG, D as NAI_HOP_TIMEOUT_MS, E as IMAGE_GEN_TIMEOUT_MS, F as UC, G as __exportAll$1, H as migrateGrokId, I as UNCENSORED_TAG, L as defaultImageParams, M as RESOLUTIONS, N as SAMPLERS, O as NAI_MODELS, P as SENSITIVE_PREFIX, R as defaultPureParams, S as FULLBODY_TAG, T as IMAGE_DRAW_TIMEOUT_MS, U as normalizePureParams, V as mergeLlmParams, W as shortModelLabel, _ as COOLDOWN_MS, a as IMAGE_SHOT_RULES, b as DEFAULT_NAI_BASE, c as fieldPolishHint, d as imageLengthRules, f as imageWriteMaxTokens, g as voicePolishExtra, h as splitChatPrompt, i as IMAGE_MULTI_RULES, j as PLACEHOLDERS, k as NAI_POLL_MS, l as groupFormatHint, m as roleSnapshot, n as FIELD_LABELS, o as chatContextBlock, p as multiInsertInstruction, r as IMAGE_BG_RULES, s as chatImageSystem, u as imageApplyRules, v as DEFAULT_GROK, w as GROK_MODELS$1, x as DEFAULT_STATUS_BAR, y as DEFAULT_LLM_PARAMS, z as emptyCharacter } from "./router-DcqrjO68.mjs";
 import { t as Dexie } from "../_libs/dexie.mjs";
 import { t as clsx } from "../_libs/clsx.mjs";
 import { t as twMerge } from "../_libs/tailwind-merge.mjs";
 import { t as create } from "../_libs/zustand.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/idb-CfkjCpub.js
+//#region node_modules/.nitro/vite/services/ssr/assets/idb-CmN-sBDm.js
 function cn(...inputs) {
 	return twMerge(clsx(inputs));
 }
@@ -467,6 +467,7 @@ var HuiyuDB = class extends Dexie {
 	cards;
 	appearances;
 	favorites;
+	favGroups;
 	history;
 	images;
 	kv;
@@ -482,6 +483,7 @@ var HuiyuDB = class extends Dexie {
 			images: "id",
 			kv: "key"
 		});
+		this.version(2).stores({ favGroups: "id, parentId, order" });
 	}
 };
 var db = new HuiyuDB();
@@ -504,12 +506,13 @@ function parseLlmAccounts(raw) {
 	return out;
 }
 async function loadAll() {
-	const [chats, folders, cards, appearances, favorites, history, settingsRow] = await Promise.all([
+	const [chats, folders, cards, appearances, favorites, favGroups, history, settingsRow] = await Promise.all([
 		db.chats.toArray(),
 		db.folders.toArray(),
 		db.cards.toArray(),
 		db.appearances.toArray(),
 		db.favorites.toArray(),
+		db.favGroups.toArray(),
 		db.history.toArray(),
 		db.kv.get("settings")
 	]);
@@ -522,6 +525,7 @@ async function loadAll() {
 		cards,
 		appearances,
 		favorites,
+		favGroups,
 		history,
 		settings: {
 			...defaultSettings(),
@@ -576,8 +580,8 @@ function cachedUrl(id) {
 	return id ? urlCache.get(id) ?? null : null;
 }
 //#endregion
-//#region node_modules/.nitro/vite/services/ssr/assets/routes-DGEvAUKS.js
-var routes_DGEvAUKS_exports = /* @__PURE__ */ __exportAll({
+//#region node_modules/.nitro/vite/services/ssr/assets/routes-CMbMyqb9.js
+var routes_CMbMyqb9_exports = /* @__PURE__ */ __exportAll({
 	a: () => cancelMemory,
 	c: () => regenMessage,
 	component: () => Home,
@@ -609,7 +613,10 @@ function migrateFavorite(raw) {
 		name: f.name || "未命名",
 		params: f.params,
 		blobId: f.blobId,
-		createdAt: f.createdAt || Date.now()
+		createdAt: f.createdAt || Date.now(),
+		groupId: typeof f.groupId === "string" ? f.groupId : null,
+		starred: f.starred === true,
+		...typeof f.order === "number" ? { order: f.order } : {}
 	};
 	return {
 		id: f.id || uid("fav_"),
@@ -620,7 +627,9 @@ function migrateFavorite(raw) {
 			seed: f.seed ?? null
 		},
 		blobId: f.blobId,
-		createdAt: f.createdAt || Date.now()
+		createdAt: f.createdAt || Date.now(),
+		groupId: null,
+		...typeof f.order === "number" ? { order: f.order } : {}
 	};
 }
 function promptPreview(p) {
@@ -1087,12 +1096,13 @@ function convertLegacyArchive(raw) {
 	};
 }
 async function exportArchive(kind) {
-	const [chats, folders, cards, appearances, favorites, history, settingsRow] = await Promise.all([
+	const [chats, folders, cards, appearances, favorites, favGroups, history, settingsRow] = await Promise.all([
 		db.chats.toArray(),
 		db.folders.toArray(),
 		db.cards.toArray(),
 		db.appearances.toArray(),
 		db.favorites.toArray(),
+		db.favGroups.toArray(),
 		db.history.toArray(),
 		db.kv.get("settings")
 	]);
@@ -1131,6 +1141,7 @@ async function exportArchive(kind) {
 		cards,
 		appearances,
 		favorites,
+		favGroups,
 		history,
 		hasImages: kind === "full"
 	};
@@ -1200,6 +1211,7 @@ async function importArchive(file) {
 		db.cards,
 		db.appearances,
 		db.favorites,
+		db.favGroups,
 		db.history,
 		db.images,
 		db.kv
@@ -1210,6 +1222,7 @@ async function importArchive(file) {
 		await db.cards.clear();
 		await db.appearances.clear();
 		await db.favorites.clear();
+		await db.favGroups.clear();
 		await db.history.clear();
 		await db.images.clear();
 		await db.chats.bulkPut(dump.chats ?? []);
@@ -1217,6 +1230,7 @@ async function importArchive(file) {
 		await db.cards.bulkPut(dump.cards ?? []);
 		await db.appearances.bulkPut(dump.appearances ?? []);
 		await db.favorites.bulkPut((dump.favorites ?? []).map(migrateFavorite).filter(Boolean));
+		await db.favGroups.bulkPut((dump.favGroups ?? []).filter((g) => g && typeof g.id === "string"));
 		await db.history.bulkPut(dump.history ?? []);
 		const prevVal = (await db.kv.get("settings"))?.value ?? void 0;
 		const dumpS = dump.settings;
@@ -1399,7 +1413,7 @@ function buildNaiPayload(opts) {
 		characterPrompts
 	};
 }
-function buildIdlecloudBody(built, params, insertMode = "insert") {
+function buildIdlecloudBody(built, params, insertMode = "insert", img2img) {
 	const body = {
 		model: built.model,
 		positivePrompt: built.finalPrompt,
@@ -1441,6 +1455,12 @@ function buildIdlecloudBody(built, params, insertMode = "insert") {
 				y: c.center.y
 			}]
 		}));
+	}
+	if (img2img) {
+		body.action = true;
+		body.image = img2img.image;
+		body.strength = img2img.strength;
+		body.noise = img2img.noise;
 	}
 	return body;
 }
@@ -1906,12 +1926,88 @@ function genPhaseLabel(status, error) {
 	if (status === "error") return prettyImageError(error);
 	return "";
 }
+function sortFavorites(items) {
+	return [...items].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || (b.createdAt || 0) - (a.createdAt || 0));
+}
+function orderFavorites(items) {
+	if (!items.length) return [];
+	if (items.every((f) => typeof f.order === "number")) return sortFavorites(items);
+	const next = sortHistoryNewestFirst(items).map((f, i) => ({
+		...f,
+		order: i
+	}));
+	for (const f of next) db.favorites.put(f);
+	return next;
+}
+function favGroupDescendants(groups, id) {
+	const out = /* @__PURE__ */ new Set();
+	const walk = (pid) => {
+		for (const g of groups) if (g.parentId === pid && !out.has(g.id)) {
+			out.add(g.id);
+			walk(g.id);
+		}
+	};
+	walk(id);
+	return out;
+}
+function countFavsInGroup(groups, favs, id) {
+	let n = favs.filter((f) => f.groupId === id).length;
+	for (const g of groups) if (g.parentId === id) n += countFavsInGroup(groups, favs, g.id);
+	return n;
+}
+function tidyFavTree(groups, favs) {
+	const byId = new Map(groups.map((g) => [g.id, g]));
+	const cleanGroups = groups.map((g) => {
+		let parentId = g.parentId && byId.has(g.parentId) && g.parentId !== g.id ? g.parentId : null;
+		const seen = /* @__PURE__ */ new Set([g.id]);
+		let p = parentId;
+		while (p) {
+			if (seen.has(p) || !byId.has(p)) {
+				parentId = null;
+				break;
+			}
+			seen.add(p);
+			p = byId.get(p)?.parentId ?? null;
+		}
+		return {
+			...g,
+			name: g.name || "未命名",
+			parentId,
+			collapsed: g.collapsed !== false,
+			order: typeof g.order === "number" ? g.order : 0,
+			starred: g.starred === true
+		};
+	});
+	const ids = new Set(cleanGroups.map((g) => g.id));
+	return {
+		favGroups: cleanGroups,
+		favorites: favs.map((f) => ({
+			...f,
+			groupId: f.groupId && ids.has(f.groupId) ? f.groupId : null
+		}))
+	};
+}
+function openFavAncestors(groups, id) {
+	if (!id) return groups;
+	const byId = new Map(groups.map((g) => [g.id, g]));
+	const open = /* @__PURE__ */ new Set();
+	let p = id;
+	while (p) {
+		open.add(p);
+		p = byId.get(p)?.parentId ?? null;
+	}
+	return groups.map((g) => open.has(g.id) ? {
+		...g,
+		collapsed: false
+	} : g);
+}
 function copyRoleBody(dst, src) {
 	return {
 		...dst,
 		persona: src.persona,
 		speech: src.speech,
 		appearance: src.appearance,
+		lookBlobId: src.lookBlobId,
 		personaVoices: src.personaVoices ?? dst.personaVoices,
 		extras: src.extras ?? dst.extras
 	};
@@ -1966,6 +2062,7 @@ var useApp = create((set, get) => ({
 	cards: [],
 	appearances: [],
 	favorites: [],
+	favGroups: [],
 	history: [],
 	pureParams: defaultPureParams(),
 	currentId: null,
@@ -1973,12 +2070,14 @@ var useApp = create((set, get) => ({
 	toasts: [],
 	ui: ui0(),
 	composerDrafts: {},
+	composerShots: {},
 	hydrate: async () => {
 		const data = await loadAll();
-		const [pureRow, currentRow, draftsRow] = await Promise.all([
+		const [pureRow, currentRow, draftsRow, shotsRow] = await Promise.all([
 			db.kv.get("pureParams"),
 			db.kv.get("currentId"),
-			db.kv.get("composerDrafts")
+			db.kv.get("composerDrafts"),
+			db.kv.get("composerShots")
 		]);
 		const live = data.chats.filter((c) => !c.isDraft).map((c) => {
 			const mapped = {
@@ -2009,16 +2108,20 @@ var useApp = create((set, get) => ({
 			key: "settings",
 			value: nextSettings
 		});
+		const favs = orderFavorites((data.favorites ?? []).map(migrateFavorite).filter(Boolean));
+		const tree = tidyFavTree(data.favGroups ?? [], favs);
 		set({
 			ready: true,
 			...data,
 			settings: nextSettings,
 			chats: live,
-			favorites: sortHistoryNewestFirst((data.favorites ?? []).map(migrateFavorite).filter(Boolean)),
+			favorites: tree.favorites,
+			favGroups: tree.favGroups,
 			pureParams: normalizePureParams(pureRow?.value ?? defaultPureParams()),
 			currentId,
 			history: sortHistoryNewestFirst(data.history ?? []),
-			composerDrafts: parseComposerDrafts(draftsRow?.value)
+			composerDrafts: parseComposerDrafts(draftsRow?.value),
+			composerShots: parseComposerShots(shotsRow?.value)
 		});
 	},
 	toast: (text) => {
@@ -2276,15 +2379,21 @@ var useApp = create((set, get) => ({
 		db.folders.bulkDelete([...ids]);
 		set((s) => {
 			const composerDrafts = dropDrafts(s.composerDrafts, ids);
+			const composerShots = dropShots(s.composerShots, ids);
 			db.kv.put({
 				key: "composerDrafts",
 				value: composerDrafts
+			});
+			db.kv.put({
+				key: "composerShots",
+				value: composerShots
 			});
 			return {
 				chats: moved,
 				folders,
 				currentId: ids.has(s.currentId || "") ? moved[0]?.id ?? null : s.currentId,
 				composerDrafts,
+				composerShots,
 				ui: {
 					...s.ui,
 					selectMode: false,
@@ -2608,17 +2717,22 @@ var useApp = create((set, get) => ({
 			if (p.seed != null) p.seedLocked = true;
 			return p;
 		})();
+		const loose = get().favorites.filter((f) => !f.groupId);
+		const top = loose.reduce((m, f) => Math.min(m, f.order ?? 0), 0);
 		const f = {
 			id: uid("fav_"),
 			name: presetNameFrom(params),
 			params,
 			blobId,
-			createdAt: Date.now()
+			createdAt: Date.now(),
+			groupId: null,
+			starred: false,
+			order: loose.length ? top - 1 : 0
 		};
 		(async () => {
 			try {
 				await db.favorites.put(f);
-				set((s) => ({ favorites: sortHistoryNewestFirst([f, ...s.favorites]) }));
+				set((s) => ({ favorites: sortFavorites([f, ...s.favorites]) }));
 				get().toast("已保存");
 			} catch (err) {
 				get().toast(err instanceof Error ? err.message : "收藏失败");
@@ -2635,7 +2749,7 @@ var useApp = create((set, get) => ({
 		(async () => {
 			try {
 				await db.favorites.put(next);
-				set((s) => ({ favorites: sortHistoryNewestFirst(s.favorites.map((f) => f.id === id ? next : f)) }));
+				set((s) => ({ favorites: sortFavorites(s.favorites.map((f) => f.id === id ? next : f)) }));
 			} catch (err) {
 				get().toast(err instanceof Error ? err.message : "收藏更新失败");
 			}
@@ -2647,6 +2761,144 @@ var useApp = create((set, get) => ({
 		db.favorites.delete(id);
 		if (row?.blobId && !blobInUse(get(), row.blobId, id)) deleteImage(row.blobId);
 		get().toast("已删除");
+	},
+	reorderFavorites: (ids) => {
+		const rank = new Map(ids.map((id, i) => [id, i]));
+		const next = sortFavorites(get().favorites.map((f) => rank.has(f.id) ? {
+			...f,
+			order: rank.get(f.id)
+		} : f));
+		set({ favorites: next });
+		for (const f of next) db.favorites.put(f);
+	},
+	setFavOrders: (groupOrders, favOrders) => {
+		set((s) => {
+			return {
+				favGroups: s.favGroups.map((g) => {
+					if (!(g.id in groupOrders) || groupOrders[g.id] === g.order) return g;
+					const next = {
+						...g,
+						order: groupOrders[g.id]
+					};
+					db.favGroups.put(next);
+					return next;
+				}),
+				favorites: sortFavorites(s.favorites.map((f) => {
+					if (!(f.id in favOrders) || favOrders[f.id] === (f.order ?? 0)) return f;
+					const next = {
+						...f,
+						order: favOrders[f.id]
+					};
+					db.favorites.put(next);
+					return next;
+				}))
+			};
+		});
+	},
+	addFavGroup: (name) => {
+		const title = name.trim() || "未命名";
+		const roots = get().favGroups.filter((g) => !g.parentId);
+		const top = roots.reduce((m, g) => Math.min(m, g.order), 0);
+		const row = {
+			id: uid("fg_"),
+			name: title,
+			parentId: null,
+			collapsed: true,
+			order: roots.length ? top - 1 : 0,
+			starred: false,
+			createdAt: Date.now()
+		};
+		db.favGroups.put(row);
+		set((s) => ({ favGroups: [row, ...s.favGroups] }));
+	},
+	renameFavGroup: (id, name) => {
+		const row = get().favGroups.find((g) => g.id === id);
+		if (!row) return;
+		const next = {
+			...row,
+			name: name.trim() || "未命名"
+		};
+		db.favGroups.put(next);
+		set((s) => ({ favGroups: s.favGroups.map((g) => g.id === id ? next : g) }));
+	},
+	toggleFavGroup: (id) => {
+		const row = get().favGroups.find((g) => g.id === id);
+		if (!row) return;
+		const next = {
+			...row,
+			collapsed: !row.collapsed
+		};
+		db.favGroups.put(next);
+		set((s) => ({ favGroups: s.favGroups.map((g) => g.id === id ? next : g) }));
+	},
+	deleteFavGroup: (id) => {
+		const dropG = /* @__PURE__ */ new Set([id, ...favGroupDescendants(get().favGroups, id)]);
+		const dropF = get().favorites.filter((f) => f.groupId && dropG.has(f.groupId));
+		set((s) => ({
+			favGroups: s.favGroups.filter((g) => !dropG.has(g.id)),
+			favorites: s.favorites.filter((f) => !(f.groupId && dropG.has(f.groupId)))
+		}));
+		for (const gid of dropG) db.favGroups.delete(gid);
+		for (const f of dropF) {
+			db.favorites.delete(f.id);
+			if (f.blobId && !blobInUse(get(), f.blobId)) deleteImage(f.blobId);
+		}
+		get().toast("已删除");
+	},
+	moveFavorite: (id, groupId) => {
+		const favs = get().favorites;
+		if (!favs.find((f) => f.id === id)) return;
+		if (groupId && !get().favGroups.some((g) => g.id === groupId)) return;
+		const sib = favs.filter((f) => f.id !== id && (f.groupId ?? null) === groupId);
+		const top = sib.reduce((m, f) => Math.min(m, f.order ?? 0), 0);
+		const groups = openFavAncestors(get().favGroups, groupId);
+		if (groups !== get().favGroups) {
+			set({ favGroups: groups });
+			for (const g of groups) if (!g.collapsed) db.favGroups.put(g);
+		}
+		get().patchFavorite(id, {
+			groupId,
+			order: sib.length ? top - 1 : 0
+		});
+	},
+	moveFavGroup: (id, parentId) => {
+		const groups = get().favGroups;
+		const row = groups.find((g) => g.id === id);
+		if (!row) return;
+		if (parentId) {
+			if (parentId === id || favGroupDescendants(groups, id).has(parentId)) return;
+			if (!groups.some((g) => g.id === parentId)) return;
+		}
+		const sib = groups.filter((g) => g.id !== id && (g.parentId ?? null) === parentId);
+		const top = sib.reduce((m, g) => Math.min(m, g.order), 0);
+		const moved = {
+			...row,
+			parentId,
+			order: sib.length ? top - 1 : 0
+		};
+		const next = openFavAncestors(groups.map((g) => g.id === id ? moved : g), parentId);
+		set({ favGroups: next });
+		for (const g of next) db.favGroups.put(g);
+	},
+	toggleFavoriteStar: (id) => {
+		const row = get().favorites.find((f) => f.id === id);
+		if (!row) return;
+		const next = {
+			...row,
+			starred: !row.starred
+		};
+		db.favorites.put(next);
+		set((s) => ({ favorites: s.favorites.map((f) => f.id === id ? next : f) }));
+	},
+	toggleFavGroupStar: (id) => {
+		const row = get().favGroups.find((g) => g.id === id);
+		if (!row) return;
+		const next = {
+			...row,
+			starred: !row.starred
+		};
+		db.favGroups.put(next);
+		set((s) => ({ favGroups: s.favGroups.map((g) => g.id === id ? next : g) }));
 	},
 	setFavoriteThumb: (id, blobId) => {
 		const old = get().favorites.find((f) => f.id === id)?.blobId;
@@ -2687,6 +2939,21 @@ var useApp = create((set, get) => ({
 			});
 			return { composerDrafts };
 		});
+	},
+	setComposerShot: (chatId, shot) => {
+		set((s) => {
+			const composerShots = { ...s.composerShots };
+			if (shot?.blobId) composerShots[chatId] = {
+				blobId: shot.blobId,
+				i2i: shot.i2i
+			};
+			else delete composerShots[chatId];
+			db.kv.put({
+				key: "composerShots",
+				value: composerShots
+			});
+			return { composerShots };
+		});
 	}
 }));
 function parseComposerDrafts(raw) {
@@ -2697,6 +2964,24 @@ function parseComposerDrafts(raw) {
 }
 function dropDrafts(drafts, ids) {
 	const next = { ...drafts };
+	for (const id of ids) delete next[id];
+	return next;
+}
+function parseComposerShots(raw) {
+	if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+	const out = {};
+	for (const [k, v] of Object.entries(raw)) {
+		if (!k || !v || typeof v !== "object") continue;
+		const row = v;
+		if (typeof row.blobId === "string" && row.blobId) out[k] = {
+			blobId: row.blobId,
+			i2i: row.i2i === true
+		};
+	}
+	return out;
+}
+function dropShots(shots, ids) {
+	const next = { ...shots };
 	for (const id of ids) delete next[id];
 	return next;
 }
@@ -2713,10 +2998,18 @@ function liftImageAi(settings, chats, currentId) {
 }
 function blobInUse(s, blobId, skipFav) {
 	if (s.favorites.some((f) => f.blobId === blobId && f.id !== skipFav)) return true;
+	if (s.favorites.some((f) => f.params.img2imgBlobId === blobId)) return true;
+	if (s.pureParams.img2imgBlobId === blobId) return true;
 	if (s.history.some((h) => h.blobId === blobId)) return true;
+	if (s.cards.some((card) => card.characters.some((c) => c.lookBlobId === blobId))) return true;
 	for (const c of s.chats) {
 		if (c.avatarBlobId === blobId) return true;
-		for (const m of c.messages) if (m.images.some((g) => g.blobId === blobId)) return true;
+		if (c.imageParams.img2imgBlobId === blobId) return true;
+		if (c.characters.some((ch) => ch.lookBlobId === blobId)) return true;
+		for (const m of c.messages) {
+			if (m.userImageBlobId === blobId) return true;
+			if (m.images.some((g) => g.blobId === blobId)) return true;
+		}
 	}
 	return false;
 }
@@ -2844,7 +3137,7 @@ async function grokOnceRaw(body, signal) {
 		body: JSON.stringify({
 			...rest,
 			stream: false,
-			params: ownParams ?? (presetOn ? s.llmParams : void 0)
+			params: ownParams ?? (presetOn && rest.task !== "image" ? s.llmParams : void 0)
 		}),
 		signal
 	});
@@ -2901,7 +3194,7 @@ async function grokStreamRaw(body, onDelta, signal) {
 	} : {
 		...body,
 		stream: true,
-		params: ownParams ?? (presetOn ? s.llmParams : void 0)
+		params: ownParams ?? (presetOn && body.task !== "image" ? s.llmParams : void 0)
 	};
 	const res = await fetch(url, {
 		method: "POST",
@@ -3452,6 +3745,120 @@ function legacyPresentIds(text, characters) {
 	}
 	return ids;
 }
+function readChunks(buf) {
+	const view = new DataView(buf);
+	if (view.getUint32(0) !== 2303741511 || view.getUint32(4) !== 218765834) throw new Error("不是 PNG");
+	const texts = {};
+	let offset = 8;
+	const u8 = new Uint8Array(buf);
+	while (offset + 8 < buf.byteLength) {
+		const len = view.getUint32(offset);
+		const type = String.fromCharCode(u8[offset + 4], u8[offset + 5], u8[offset + 6], u8[offset + 7]);
+		const start = offset + 8;
+		const data = u8.slice(start, start + len);
+		if (type === "tEXt") {
+			const nul = data.indexOf(0);
+			if (nul > 0) {
+				const key = new TextDecoder().decode(data.slice(0, nul));
+				texts[key] = new TextDecoder("latin1").decode(data.slice(nul + 1));
+			}
+		} else if (type === "iTXt") {
+			const nul = data.indexOf(0);
+			if (nul > 0) {
+				const key = new TextDecoder().decode(data.slice(0, nul));
+				let i = nul + 1;
+				const compressed = data[i];
+				i += 2;
+				i = data.indexOf(0, i) + 1;
+				i = data.indexOf(0, i) + 1;
+				let val;
+				if (compressed) val = "";
+				else val = new TextDecoder().decode(data.slice(i));
+				texts[key] = val;
+			}
+		} else if (type === "IEND") break;
+		offset = start + len + 4;
+	}
+	return texts;
+}
+function parseNaiPng(buf) {
+	const texts = readChunks(buf);
+	const comment = texts.Comment || texts.comment || texts.Description || "";
+	const raw = comment || JSON.stringify(texts);
+	let json = null;
+	try {
+		json = JSON.parse(comment);
+	} catch {
+		json = null;
+	}
+	const src = json ?? {};
+	const v4 = src.v4_prompt?.caption;
+	const v4neg = src.v4_negative_prompt?.caption;
+	const charCaps = Array.isArray(v4?.char_captions) ? v4.char_captions : [];
+	const ucCaps = Array.isArray(v4neg?.char_captions) ? v4neg.char_captions : [];
+	const characters = charCaps.map((c, i) => ({
+		prompt: String(c?.char_caption || ""),
+		uc: String(ucCaps[i]?.char_caption || ""),
+		x: Number(c?.centers?.[0]?.x ?? .5),
+		y: Number(c?.centers?.[0]?.y ?? .5)
+	}));
+	return {
+		prompt: (v4?.base_caption || src.prompt || texts.prompt || "").toString(),
+		uc: (src.uc || src.negative_prompt || "").toString(),
+		width: Number(src.width) || void 0,
+		height: Number(src.height) || void 0,
+		steps: Number(src.steps) || void 0,
+		scale: Number(src.scale) || void 0,
+		sampler: src.sampler || void 0,
+		seed: Number(src.seed) || void 0,
+		noiseSchedule: src.noise_schedule || void 0,
+		model: src.sm ?? src.model,
+		raw,
+		characters: characters.length ? characters : void 0
+	};
+}
+async function naiSeedOf(file) {
+	try {
+		const meta = parseNaiPng(await file.arrayBuffer());
+		return meta.seed && meta.seed > 0 ? meta.seed : void 0;
+	} catch {
+		return;
+	}
+}
+async function compressRef(file, maxEdge = 1024, quality = .85) {
+	try {
+		const bmp = await createImageBitmap(file);
+		const scale = Math.min(1, maxEdge / Math.max(bmp.width, bmp.height));
+		const w = Math.max(1, Math.round(bmp.width * scale));
+		const h = Math.max(1, Math.round(bmp.height * scale));
+		const canvas = document.createElement("canvas");
+		canvas.width = w;
+		canvas.height = h;
+		const ctx = canvas.getContext("2d");
+		if (!ctx) {
+			bmp.close();
+			return file;
+		}
+		ctx.drawImage(bmp, 0, 0, w, h);
+		bmp.close();
+		return await new Promise((res) => canvas.toBlob(res, "image/jpeg", quality)) ?? file;
+	} catch {
+		return file;
+	}
+}
+async function blobRawB64(blob) {
+	const bytes = new Uint8Array(await blob.arrayBuffer());
+	let binary = "";
+	const chunk = 32768;
+	for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+	return btoa(binary);
+}
+async function blobDataUrl(id) {
+	if (!id) return null;
+	const blob = await getImage(id);
+	if (!blob) return null;
+	return `data:${blob.type || "image/jpeg"};base64,${await blobRawB64(blob)}`;
+}
 function stripStatus(text) {
 	const i = text.lastIndexOf("状态栏:");
 	if (i < 0) return {
@@ -3462,6 +3869,62 @@ function stripStatus(text) {
 		body: text.slice(0, i).trim(),
 		status: text.slice(i).trim()
 	};
+}
+async function decorateVision(chat, msgs) {
+	let last = -1;
+	for (let i = msgs.length - 1; i >= 0; i--) if (msgs[i].role === "user") last = i;
+	if (last < 0) return msgs;
+	const windowMsgs = chat.messages.slice(0, chat.messages.length);
+	const start = Math.max(0, windowMsgs.length - recentWindow());
+	const recent = windowMsgs.slice(start);
+	let src;
+	for (let i = recent.length - 1; i >= 0; i--) if (recent[i].role === "user") {
+		src = recent[i];
+		break;
+	}
+	const parts = [{
+		type: "text",
+		text: msgs[last].content
+	}];
+	let added = false;
+	if (src?.userImageBlobId) {
+		const url = await blobDataUrl(src.userImageBlobId);
+		if (url) {
+			parts.push({
+				type: "text",
+				text: "下面这张是用户这一轮发来的图。"
+			});
+			parts.push({
+				type: "image_url",
+				image_url: { url }
+			});
+			added = true;
+		}
+	}
+	for (const c of chat.characters) {
+		if (!c.lookBlobId) continue;
+		const url = await blobDataUrl(c.lookBlobId);
+		if (!url) continue;
+		const name = c.name.trim() || "角色";
+		parts.push({
+			type: "text",
+			text: `下面这张是${name}的外貌参考，只用来认长相和衣服，不是用户发来的照片。`
+		});
+		parts.push({
+			type: "image_url",
+			image_url: { url }
+		});
+		added = true;
+	}
+	if (!added) return msgs;
+	return msgs.map((m, i) => i === last ? {
+		...m,
+		content: parts
+	} : m);
+}
+function clampUnit(n, min, max) {
+	if (!Number.isFinite(n)) return min;
+	return Math.min(max, Math.max(min, n));
 }
 function recentWindow() {
 	const s = useApp.getState().settings;
@@ -3487,7 +3950,7 @@ function historyMessages(chat, upto) {
 	}
 	return recent.map((m, i) => ({
 		role: m.role === "user" ? "user" : "assistant",
-		content: m.role === "user" ? formatUserForChat(m.content, i === lastUser ? standing : []) : stripSpeakerPrefix(replyContextText(m.content), [
+		content: m.role === "user" ? formatUserForChat(m.userImageBlobId && !m.content.trim() ? "用户这轮发来一张图，没有写字。看着这张图回复，不要当成没说话去自己推进剧情。" : m.content, i === lastUser ? standing : []) : stripSpeakerPrefix(replyContextText(m.content), [
 			m.characterName,
 			chat.name,
 			...chat.characters.map((c) => c.name),
@@ -3751,7 +4214,17 @@ async function generateNai(opts) {
 		insertMode: opts.chat.promptMode,
 		seed: opts.seed
 	});
-	const payload = buildIdlecloudBody(built, opts.chat.imageParams, opts.chat.promptMode);
+	const blobId = opts.chat.imageParams.img2imgBlobId || opts.turnImageBlobId || "";
+	let img2img;
+	if (blobId) {
+		const blob = await getImage(blobId);
+		if (blob) img2img = {
+			image: await blobRawB64(blob),
+			strength: clampUnit(opts.chat.imageParams.img2imgStrength ?? .7, .01, .99),
+			noise: clampUnit(opts.chat.imageParams.img2imgNoise ?? 0, 0, .99)
+		};
+	}
+	const payload = buildIdlecloudBody(built, opts.chat.imageParams, opts.chat.promptMode, img2img);
 	opts.onStart?.();
 	const finish = async (b64) => {
 		opts.onReceiving?.();
@@ -3934,12 +4407,17 @@ function bumpMemoryEpoch(id) {
 async function sendOpening(id) {
 	await runReply(id, null, true);
 }
-async function sendUser(id, text) {
+async function sendUser(id, text, shot) {
 	const t = text.trim();
 	abortChat(id);
+	const msg = makeUserMessage(t);
+	if (shot?.blobId) {
+		msg.userImageBlobId = shot.blobId;
+		msg.userImageI2i = shot.i2i;
+	}
 	patch(id, (c) => ({
 		...c,
-		messages: [...c.messages, makeUserMessage(t)]
+		messages: [...c.messages, msg]
 	}));
 	await runReply(id, t, false);
 }
@@ -4014,7 +4492,7 @@ async function branchFrom(id, msgId) {
 		chats: [...s.chats, copy],
 		currentId: copy.id
 	}));
-	const { db } = await import("../_libs/_.mjs").then((n) => n.a);
+	const { db } = await import("../_libs/_.mjs").then((n) => n.o);
 	db.chats.put(copy);
 	useApp.getState().toast(`已开分支「${copy.name}」`);
 }
@@ -4094,11 +4572,12 @@ async function runReply(id, _userText, opening, regen = false) {
 	].filter(Boolean).join("\n\n");
 	const live = chat(id);
 	const prevScene = previousRoundImagePrompt(live.messages, placeholder.id);
-	const msgs = historyMessages(live).filter((m) => m.content);
-	if (opening && msgs.length === 0) msgs.push({
+	const hist = historyMessages(live).filter((m) => m.content);
+	if (opening && hist.length === 0) hist.push({
 		role: "user",
 		content: formatUserForChat(OPENING_USER, standingDirectives(live))
 	});
+	const msgs = await decorateVision(live, hist);
 	let raw = "";
 	let promptStarted = false;
 	let streamFailed = false;
@@ -4256,13 +4735,15 @@ async function attachImage(id, msgId, mode = "auto", custom, customChars, parsed
 			charTails
 		});
 		await afterPaint();
+		const live = chat(id) ?? c;
 		const result = await generateNai({
-			chat: chat(id) ?? c,
+			chat: live,
 			grokTail,
 			charTails,
 			seed: img.seed,
 			apiKey: settings.naiKey,
 			baseUrl: settings.naiBase,
+			turnImageBlobId: turnI2iBlob(live, msgId),
 			signal: ac.signal,
 			onStart: () => setImg({ status: "generating" }),
 			onReceiving: () => {
@@ -4298,6 +4779,14 @@ async function attachImage(id, msgId, mode = "auto", custom, customChars, parsed
 		if (err !== "已取消") useApp.getState().toast(err);
 	} finally {
 		if (imageAborts.get(key) === ac) imageAborts.delete(key);
+	}
+}
+function turnI2iBlob(c, msgId) {
+	if (c.imageParams.img2imgBlobId) return void 0;
+	const idx = c.messages.findIndex((m) => m.id === msgId);
+	for (let i = idx - 1; i >= 0; i--) {
+		const m = c.messages[i];
+		if (m.role === "user") return m.userImageI2i ? m.userImageBlobId : void 0;
 	}
 }
 function mapCharTails(c, chars) {
@@ -5012,6 +5501,22 @@ function ChatPane({ chat }) {
 	const inputRef = (0, import_react.useRef)(null);
 	const [atBottom, setAtBottom] = (0, import_react.useState)(true);
 	const draft = useApp((s) => s.composerDrafts[chat.id] ?? "");
+	const shot = useApp((s) => s.composerShots[chat.id]);
+	const fileRef = (0, import_react.useRef)(null);
+	const [shotUrl, setShotUrl] = (0, import_react.useState)(null);
+	(0, import_react.useEffect)(() => {
+		if (!shot?.blobId) {
+			setShotUrl(null);
+			return;
+		}
+		let dead = false;
+		imageUrl(shot.blobId).then((u) => {
+			if (!dead) setShotUrl(u);
+		});
+		return () => {
+			dead = true;
+		};
+	}, [shot?.blobId]);
 	(0, import_react.useEffect)(() => {
 		const el = scroller.current;
 		if (!el) return;
@@ -5054,7 +5559,12 @@ function ChatPane({ chat }) {
 			return;
 		}
 		useApp.getState().setComposerDraft(chat.id, "");
-		sendUser(chat.id, t);
+		const pending = shot?.blobId ? {
+			blobId: shot.blobId,
+			i2i: shot.i2i
+		} : void 0;
+		useApp.getState().setComposerShot(chat.id, null);
+		sendUser(chat.id, t, pending);
 	};
 	const portrait = chat.imageParams.height >= chat.imageParams.width;
 	const { W, I } = foldWindow();
@@ -5206,6 +5716,31 @@ function ChatPane({ chat }) {
 							children: "重试"
 						}) : null]
 					}) : null,
+					shot?.blobId ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "mb-2 ml-11 flex items-end gap-2",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "relative",
+							children: [shotUrl ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+								src: shotUrl,
+								alt: "",
+								className: "h-24 w-20 rounded-[14px] object-cover"
+							}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "h-24 w-20 rounded-[14px] bg-dim" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+								type: "button",
+								className: "absolute -right-1 -top-1 grid size-6 place-items-center rounded-full bg-card text-ink",
+								"aria-label": "去掉图片",
+								onClick: () => useApp.getState().setComposerShot(chat.id, null),
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { className: "size-3.5" })
+							})]
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: `rounded-full border px-2.5 py-1 text-[12px] ${shot.i2i ? "border-primary bg-primary text-on-primary" : "border-line text-muted"}`,
+							onClick: () => useApp.getState().setComposerShot(chat.id, {
+								blobId: shot.blobId,
+								i2i: !shot.i2i
+							}),
+							children: "以图生图"
+						})]
+					}) : null,
 					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 						className: "flex items-end gap-2",
 						children: [
@@ -5241,6 +5776,31 @@ function ChatPane({ chat }) {
 								className: "max-h-32 min-h-[46px] flex-1 resize-none rounded-full border border-line bg-card px-4 py-3 text-[14px] outline-none"
 							}),
 							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+								type: "button",
+								className: "grid size-11 shrink-0 place-items-center rounded-full border border-line text-ink",
+								"aria-label": "添加图片",
+								onClick: () => fileRef.current?.click(),
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Plus, { className: "size-5" })
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+								ref: fileRef,
+								type: "file",
+								accept: "image/*",
+								className: "hidden",
+								onChange: (e) => {
+									const file = e.target.files?.[0];
+									e.target.value = "";
+									if (!file) return;
+									compressRef(file, 1024, .85).then(async (blob) => {
+										const id = await saveBlob(blob);
+										useApp.getState().setComposerShot(chat.id, {
+											blobId: id,
+											i2i: false
+										});
+									});
+								}
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
 								onClick: send,
 								className: "grid size-11 shrink-0 place-items-center rounded-full bg-primary text-on-primary",
 								"aria-label": editUser ? "保存" : "发送",
@@ -5260,6 +5820,29 @@ function ChatPane({ chat }) {
 				]
 			})
 		]
+	});
+}
+function UserShot({ blobId, i2i }) {
+	const [url, setUrl] = (0, import_react.useState)(null);
+	(0, import_react.useEffect)(() => {
+		let dead = false;
+		imageUrl(blobId).then((u) => {
+			if (!dead) setUrl(u);
+		});
+		return () => {
+			dead = true;
+		};
+	}, [blobId]);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "mb-1.5 flex max-w-[85%] flex-col items-end",
+		children: [url ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+			src: url,
+			alt: "",
+			className: "h-28 max-w-full rounded-[14px] object-cover"
+		}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "h-28 w-24 rounded-[14px] bg-dim" }), i2i ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			className: "mt-1 text-[11px] text-muted",
+			children: "以图生图"
+		}) : null]
 	});
 }
 function jumpParams(section) {
@@ -5288,24 +5871,31 @@ function Bubble({ chat, msg, showImageTray, onUseOption, onEditUser }) {
 	};
 	if (msg.role === "user") return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 		className: "mb-4 flex flex-col items-end",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-			className: cn("w-fit min-h-[2.75rem] min-w-[5.5rem] max-w-[85%] rounded-[18px] border px-4 py-2.5", editingUser ? "border-primary bg-card" : "border-line bg-card"),
-			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-				className: "whitespace-pre-wrap text-[14px] leading-relaxed text-ink",
-				children: msg.content
+		children: [
+			msg.userImageBlobId ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(UserShot, {
+				blobId: msg.userImageBlobId,
+				i2i: msg.userImageI2i
+			}) : null,
+			msg.content.trim() ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: cn("w-fit min-h-[2.75rem] min-w-[5.5rem] max-w-[85%] rounded-[18px] border px-4 py-2.5", editingUser ? "border-primary bg-card" : "border-line bg-card"),
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "whitespace-pre-wrap text-[14px] leading-relaxed text-ink",
+					children: msg.content
+				})
+			}) : null,
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "mt-1.5 flex justify-end gap-1.5",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Mini, {
+					onClick: () => onEditUser?.(),
+					icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Pencil, { className: "size-3" }),
+					label: "编辑"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Mini, {
+					onClick: () => void branchFrom(chat.id, msg.id),
+					icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(GitBranch, { className: "size-3" }),
+					label: "开分支"
+				})]
 			})
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-			className: "mt-1.5 flex justify-end gap-1.5",
-			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Mini, {
-				onClick: () => onEditUser?.(),
-				icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Pencil, { className: "size-3" }),
-				label: "编辑"
-			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Mini, {
-				onClick: () => void branchFrom(chat.id, msg.id),
-				icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(GitBranch, { className: "size-3" }),
-				label: "开分支"
-			})]
-		})]
+		]
 	});
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 		className: "mb-6",
@@ -6938,7 +7528,7 @@ function buzz() {
 		navigator.vibrate?.(12);
 	} catch {}
 }
-function GripBars() {
+function GripBars$1() {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
 		className: "flex flex-col items-center justify-center gap-[3.5px] text-current",
 		"aria-hidden": true,
@@ -7227,7 +7817,7 @@ function LibraryDrawer({ items, onApply, onDelete, onReorder, label = "角色选
 								"aria-label": `拖动${c.name}`,
 								onPointerDown: (e) => onGripDown(e, c.id),
 								style: { touchAction: "none" },
-								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(GripBars, {})
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(GripBars$1, {})
 							}) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
 								type: "button",
 								"data-row-action": true,
@@ -7351,6 +7941,7 @@ function ParamsPane({ chat, mode = "chat" }) {
 	const v3 = naiFamily(p.model) === "v3";
 	const hideSplit = mode === "pure" && p.merged;
 	const jump = useApp((s) => s.ui.paramsJump);
+	const charLocked = useApp((s) => s.settings.pureCharLocked === true);
 	const previewOpen = useApp((s) => s.ui.previewParams);
 	const previewRef = (0, import_react.useRef)(null);
 	const chatId = chat.id;
@@ -7470,7 +8061,12 @@ function ParamsPane({ chat, mode = "chat" }) {
 							const src = useApp.getState().chats.find((c) => c.id === id);
 							if (!src) return;
 							const { characters: _c, useCoords: _u, ...rest } = structuredClone(src.imageParams);
-							useApp.getState().patchParams(chatId, rest);
+							useApp.getState().patchParams(chatId, {
+								...rest,
+								img2imgBlobId: rest.img2imgBlobId || "",
+								img2imgStrength: rest.img2imgStrength ?? .7,
+								img2imgNoise: rest.img2imgNoise ?? 0
+							});
 							setPeek(null);
 							useApp.getState().setUI({ previewParams: false });
 							useApp.getState().toast("已套用参数");
@@ -7662,6 +8258,22 @@ function ParamsPane({ chat, mode = "chat" }) {
 					menu: "end"
 				})]
 			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Img2ImgBox, {
+				blobId: p.img2imgBlobId,
+				strength: p.img2imgStrength ?? .7,
+				noise: p.img2imgNoise ?? 0,
+				onFile: async (file) => {
+					const seed = await naiSeedOf(file);
+					const next = { img2imgBlobId: await saveBlob(await compressRef(file, 1216, .9)) };
+					if (p.img2imgStrength == null) next.img2imgStrength = .7;
+					if (p.img2imgNoise == null) next.img2imgNoise = 0;
+					if (seed != null) next.seed = seed;
+					commit(next);
+				},
+				onClear: () => commit({ img2imgBlobId: "" }),
+				onStrength: (n) => commit({ img2imgStrength: n }),
+				onNoise: (n) => commit({ img2imgNoise: n })
+			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 				className: "mb-3 flex items-center gap-2",
 				"data-section": "sampler",
@@ -7780,9 +8392,18 @@ function ParamsPane({ chat, mode = "chat" }) {
 				className: "mb-8 mt-4",
 				"data-section": "chars",
 				children: [
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-						className: "text-[15px] font-medium",
-						children: "角色提示词 (V4 / V5)"
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "flex items-center justify-between gap-2",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "text-[15px] font-medium",
+							children: "角色提示词 (V4 / V5)"
+						}), mode === "pure" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: `grid size-9 shrink-0 place-items-center ${charLocked ? "text-primary" : "text-muted"}`,
+							onClick: () => useApp.getState().setSettings({ pureCharLocked: !charLocked }),
+							"aria-label": "锁定角色",
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Lock, { className: "size-4" })
+						})]
 					}),
 					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 						className: "mb-2 text-[11px] text-muted",
@@ -7807,7 +8428,7 @@ function ParamsPane({ chat, mode = "chat" }) {
 						return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CharCard, {
 							ch,
 							index: i,
-							name: (role?.name || ch.name || "").trim(),
+							name: mode === "pure" ? "" : (role?.name || ch.name || "").trim(),
 							suggest: p.tagSuggest,
 							useCoords: p.useCoords,
 							onChange: (next) => patch({ characters: p.characters.map((x) => x.id === ch.id ? next : x) }),
@@ -8212,77 +8833,109 @@ function PromptBox({ value, onChange, suggest, minH }) {
 		})]
 	});
 }
-function readChunks(buf) {
-	const view = new DataView(buf);
-	if (view.getUint32(0) !== 2303741511 || view.getUint32(4) !== 218765834) throw new Error("不是 PNG");
-	const texts = {};
-	let offset = 8;
-	const u8 = new Uint8Array(buf);
-	while (offset + 8 < buf.byteLength) {
-		const len = view.getUint32(offset);
-		const type = String.fromCharCode(u8[offset + 4], u8[offset + 5], u8[offset + 6], u8[offset + 7]);
-		const start = offset + 8;
-		const data = u8.slice(start, start + len);
-		if (type === "tEXt") {
-			const nul = data.indexOf(0);
-			if (nul > 0) {
-				const key = new TextDecoder().decode(data.slice(0, nul));
-				texts[key] = new TextDecoder("latin1").decode(data.slice(nul + 1));
-			}
-		} else if (type === "iTXt") {
-			const nul = data.indexOf(0);
-			if (nul > 0) {
-				const key = new TextDecoder().decode(data.slice(0, nul));
-				let i = nul + 1;
-				const compressed = data[i];
-				i += 2;
-				i = data.indexOf(0, i) + 1;
-				i = data.indexOf(0, i) + 1;
-				let val;
-				if (compressed) val = "";
-				else val = new TextDecoder().decode(data.slice(i));
-				texts[key] = val;
-			}
-		} else if (type === "IEND") break;
-		offset = start + len + 4;
-	}
-	return texts;
-}
-function parseNaiPng(buf) {
-	const texts = readChunks(buf);
-	const comment = texts.Comment || texts.comment || texts.Description || "";
-	const raw = comment || JSON.stringify(texts);
-	let json = null;
-	try {
-		json = JSON.parse(comment);
-	} catch {
-		json = null;
-	}
-	const src = json ?? {};
-	const v4 = src.v4_prompt?.caption;
-	const v4neg = src.v4_negative_prompt?.caption;
-	const charCaps = Array.isArray(v4?.char_captions) ? v4.char_captions : [];
-	const ucCaps = Array.isArray(v4neg?.char_captions) ? v4neg.char_captions : [];
-	const characters = charCaps.map((c, i) => ({
-		prompt: String(c?.char_caption || ""),
-		uc: String(ucCaps[i]?.char_caption || ""),
-		x: Number(c?.centers?.[0]?.x ?? .5),
-		y: Number(c?.centers?.[0]?.y ?? .5)
-	}));
-	return {
-		prompt: (v4?.base_caption || src.prompt || texts.prompt || "").toString(),
-		uc: (src.uc || src.negative_prompt || "").toString(),
-		width: Number(src.width) || void 0,
-		height: Number(src.height) || void 0,
-		steps: Number(src.steps) || void 0,
-		scale: Number(src.scale) || void 0,
-		sampler: src.sampler || void 0,
-		seed: Number(src.seed) || void 0,
-		noiseSchedule: src.noise_schedule || void 0,
-		model: src.sm ?? src.model,
-		raw,
-		characters: characters.length ? characters : void 0
+function Img2ImgBox({ blobId, strength, noise, onFile, onClear, onStrength, onNoise }) {
+	const input = (0, import_react.useRef)(null);
+	const [url, setUrl] = (0, import_react.useState)(null);
+	const [over, setOver] = (0, import_react.useState)(false);
+	(0, import_react.useEffect)(() => {
+		if (!blobId) {
+			setUrl(null);
+			return;
+		}
+		let dead = false;
+		imageUrl(blobId).then((u) => {
+			if (!dead) setUrl(u);
+		});
+		return () => {
+			dead = true;
+		};
+	}, [blobId]);
+	const take = (file) => {
+		if (file && (!file.type || file.type.startsWith("image/"))) onFile(file);
 	};
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "mb-4",
+		"data-section": "img2img",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "mb-2 text-[13px] font-medium",
+				children: "图生图"
+			}),
+			blobId ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "relative overflow-hidden rounded-[16px] border border-line bg-dim",
+					children: [url ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+						src: url,
+						alt: "",
+						className: "max-h-64 w-full object-contain"
+					}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "h-36 w-full bg-dim" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "absolute right-2 top-2 grid size-8 place-items-center rounded-full bg-card/90 text-ink",
+						"aria-label": "删除底图",
+						onClick: onClear,
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Trash2, { className: "size-4" })
+					})]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "mb-1 mt-3 text-[13px] font-medium",
+					children: "图生图调整"
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "mb-1 flex items-center justify-between text-[13px]",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "强度" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "tabular-nums text-muted",
+						children: strength.toFixed(2)
+					})]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Slider, {
+					value: strength,
+					min: .01,
+					max: .99,
+					step: .01,
+					onChange: onStrength
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "mb-1 mt-3 flex items-center justify-between text-[13px]",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "噪声" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "tabular-nums text-muted",
+						children: noise.toFixed(2)
+					})]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Slider, {
+					value: noise,
+					min: 0,
+					max: .99,
+					step: .01,
+					onChange: onNoise
+				})
+			] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+				type: "button",
+				className: `flex h-36 w-full flex-col items-center justify-center gap-2 rounded-[16px] border border-dashed text-[13px] text-muted ${over ? "border-primary bg-dim" : "border-line"}`,
+				onClick: () => input.current?.click(),
+				onDragOver: (e) => {
+					e.preventDefault();
+					setOver(true);
+				},
+				onDragLeave: () => setOver(false),
+				onDrop: (e) => {
+					e.preventDefault();
+					setOver(false);
+					take(e.dataTransfer.files?.[0]);
+				},
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Upload, { className: "size-5" }), "点击或将图像拖放到此处"]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+				ref: input,
+				type: "file",
+				accept: "image/*",
+				className: "hidden",
+				onChange: (e) => {
+					take(e.target.files?.[0]);
+					e.target.value = "";
+				}
+			})
+		]
+	});
 }
 var HOLD_MS$1 = 400;
 var drawing = false;
@@ -8294,40 +8947,37 @@ function PurePane() {
 	const history = useApp((s) => s.history);
 	const left = useCooldown(useApp((s) => s.settings).cooldownUntil);
 	const [sheet, setSheet] = (0, import_react.useState)(null);
-	const [idx, setIdx] = (0, import_react.useState)(0);
+	const [viewId, setViewId] = (0, import_react.useState)(null);
 	const [url, setUrl] = (0, import_react.useState)(null);
 	const [saved, setSaved] = (0, import_react.useState)(false);
 	const [phase, setPhase] = (0, import_react.useState)(null);
 	const [flipLock, setFlipLock] = (0, import_react.useState)(false);
-	const followLatest = (0, import_react.useRef)(true);
-	const prevDone = (0, import_react.useRef)(0);
+	const [peekId, setPeekId] = (0, import_react.useState)(null);
+	const peek = useApp((s) => peekId ? s.favorites.find((f) => f.id === peekId) : void 0);
 	const done = sortHistoryNewestFirst(history.filter((h) => h.status === "done" && h.blobId));
-	const item = done[idx] ?? done[0];
-	(0, import_react.useEffect)(() => {
-		if (done.length > prevDone.current) {
-			setIdx(0);
-			followLatest.current = true;
-		} else if (idx >= done.length && done.length > 0) setIdx(0);
-		prevDone.current = done.length;
-	}, [done.length, idx]);
+	const found = viewId ? done.findIndex((h) => h.id === viewId) : -1;
+	const idx = found >= 0 ? found : 0;
+	const item = done[idx];
+	const shownBlob = peek?.blobId || item?.blobId;
 	(0, import_react.useEffect)(() => {
 		let gone = false;
-		if (item?.blobId) imageUrl(item.blobId).then((u) => {
+		if (shownBlob) imageUrl(shownBlob).then((u) => {
 			if (!gone) setUrl(u);
 		});
 		else setUrl(null);
 		return () => {
 			gone = true;
 		};
-	}, [item?.blobId]);
+	}, [shownBlob]);
 	const go = (dir) => {
+		if (peekId) {
+			setPeekId(null);
+			return;
+		}
 		const n = done.length;
 		if (n < 2) return;
-		setIdx((i) => {
-			const next = (i + dir + n) % n;
-			followLatest.current = next === 0;
-			return next;
-		});
+		const next = (idx + dir + n) % n;
+		setViewId(done[next].id);
 	};
 	const closeSheet = () => {
 		setSheet(null);
@@ -8383,7 +9033,7 @@ function PurePane() {
 					children: "还没有图。先去参数里写提示词，再点绘一张。"
 				})
 			}),
-			item && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			item && !peek && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 				className: "flex w-full flex-wrap items-center gap-x-2 gap-y-0.5 px-4 py-2 text-[11px] text-stage-muted",
 				children: [
 					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
@@ -8419,6 +9069,36 @@ function PurePane() {
 					})
 				]
 			}),
+			peek && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "flex w-full flex-wrap items-center gap-x-2 gap-y-0.5 px-4 py-2 text-[11px] text-stage-muted",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						onClick: () => jump("model"),
+						children: modelLabel(peek.params.model)
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+						onClick: () => jump("size"),
+						children: [
+							peek.params.width,
+							"×",
+							peek.params.height
+						]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+						onClick: () => jump("steps"),
+						children: [peek.params.steps, "步"]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						onClick: () => jump("sampler"),
+						children: samplerLabel(peek.params.sampler)
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: peek.params.seed ?? "随机" }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: left > 0 ? "text-danger" : "text-good",
+						children: left > 0 ? `${left}s` : "可生图"
+					})
+				]
+			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 				className: "flex items-center gap-2 px-4 pb-[calc(env(safe-area-inset-bottom)+14px)] pt-2",
 				children: [
@@ -8440,17 +9120,20 @@ function PurePane() {
 								cancelPureDraw();
 								return;
 							}
-							drawOne(setPhase);
+							drawOne(setPhase, (id) => {
+								setPeekId(null);
+								setViewId(id);
+							});
 						},
 						children: phase ? "取消" : "绘一张"
 					}),
 					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(IconBtn, {
 						className: "text-on-stage",
 						onClick: async () => {
-							if (!item?.blobId) return;
-							const u = await imageUrl(item.blobId);
+							if (!shownBlob) return;
+							const u = await imageUrl(shownBlob);
 							if (!u) return;
-							downloadBlob(await fetch(u).then((r) => r.blob()), String(item.seed));
+							downloadBlob(await fetch(u).then((r) => r.blob()), String(peek?.params.seed ?? item?.seed ?? "image"));
 							setSaved(true);
 							setTimeout(() => setSaved(false), 1e3);
 						},
@@ -8466,6 +9149,8 @@ function PurePane() {
 			sheet === "params" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PureParamsSheet, { onClose: closeSheet }),
 			sheet === "fav" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FavSheet, {
 				currentBlob: item?.blobId,
+				previewId: peekId,
+				onPreview: setPeekId,
 				onClose: closeSheet
 			}),
 			sheet === "hist" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(HistSheet, {
@@ -8473,15 +9158,15 @@ function PurePane() {
 				activeId: item?.id,
 				onClose: closeSheet,
 				onPreview: (i) => {
-					followLatest.current = i === 0;
-					setIdx(i);
+					const row = done[i];
+					if (row) setViewId(row.id);
 					closeSheet();
 				}
 			})
 		]
 	});
 }
-function Sheet({ title, onClose, extra, children }) {
+function Sheet({ title, onClose, extra, header, children }) {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 		className: "absolute inset-0 z-20 flex flex-col justify-end bg-overlay/50",
 		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
@@ -8489,7 +9174,7 @@ function Sheet({ title, onClose, extra, children }) {
 			onClick: onClose
 		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 			className: "flex max-h-[80%] min-h-0 flex-col overflow-hidden rounded-t-[28px] bg-bg text-ink",
-			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			children: [header ?? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 				className: "flex shrink-0 items-center justify-between gap-2 px-4 py-3",
 				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 					className: "text-[16px] font-semibold",
@@ -8509,10 +9194,395 @@ function Sheet({ title, onClose, extra, children }) {
 		})]
 	});
 }
-function FavSheet({ currentBlob, onClose }) {
-	const favorites = sortHistoryNewestFirst(useApp((s) => s.favorites));
+function GripBars() {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+		className: "flex flex-col items-center justify-center gap-[3.5px] text-current",
+		"aria-hidden": true,
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "h-[2px] w-4 rounded-full bg-current" }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "h-[2px] w-4 rounded-full bg-current" }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "h-[2px] w-4 rounded-full bg-current" })
+		]
+	});
+}
+function byOrder(rows, pick, starredFirst) {
+	return [...rows].sort((a, b) => {
+		if (starredFirst && Boolean(a.starred) !== Boolean(b.starred)) return a.starred ? -1 : 1;
+		return (pick(a.id) ?? a.order ?? 0) - (pick(b.id) ?? b.order ?? 0);
+	});
+}
+function applyPureParams(next) {
+	const s = useApp.getState();
+	if (s.settings.pureCharLocked) next = {
+		...next,
+		characters: structuredClone(s.pureParams.characters),
+		useCoords: s.pureParams.useCoords
+	};
+	s.setPureParams({
+		...next,
+		img2imgBlobId: next.img2imgBlobId || "",
+		img2imgStrength: next.img2imgStrength ?? .7,
+		img2imgNoise: next.img2imgNoise ?? 0
+	});
+}
+function FavSheet({ currentBlob, previewId, onPreview, onClose }) {
+	const favorites = useApp((s) => s.favorites);
+	const favGroups = useApp((s) => s.favGroups);
 	const [openId, setOpenId] = (0, import_react.useState)(null);
+	const [editId, setEditId] = (0, import_react.useState)(null);
+	const [sortMode, setSortMode] = (0, import_react.useState)(false);
+	const [dragId, setDragId] = (0, import_react.useState)(null);
+	const [holdId, setHoldId] = (0, import_react.useState)(null);
+	const [draft, setDraft] = (0, import_react.useState)(null);
+	const [menu, setMenu] = (0, import_react.useState)(null);
+	const [move, setMove] = (0, import_react.useState)(null);
+	const [naming, setNaming] = (0, import_react.useState)(null);
+	const [askDelete, setAskDelete] = (0, import_react.useState)(null);
+	const thumbs = useApp((s) => s.settings.favThumbs === true);
+	const listRef = (0, import_react.useRef)(null);
+	const pressTimer = (0, import_react.useRef)(0);
+	const press = (0, import_react.useRef)(null);
+	const sortRef = (0, import_react.useRef)(false);
+	const draftRef = (0, import_react.useRef)(null);
+	const dragRef = (0, import_react.useRef)(null);
+	const lastY = (0, import_react.useRef)(0);
+	const rafRef = (0, import_react.useRef)(0);
+	const gOrder = (id) => draft?.groups[id];
+	const fOrder = (id) => draft?.favs[id];
+	const pinStars = !(sortMode && draft);
+	const groupsOf = (parentId) => byOrder(favGroups.filter((g) => (g.parentId ?? null) === parentId), gOrder, pinStars);
+	const favsOf = (groupId) => byOrder(favorites.filter((f) => (f.groupId ?? null) === groupId), fOrder, pinStars);
 	const current = favorites.find((f) => f.id === openId);
+	const editing = favorites.find((f) => f.id === editId);
+	const saveDraft = () => {
+		const d = draftRef.current;
+		if (!sortRef.current || !d) return;
+		sortRef.current = false;
+		useApp.getState().setFavOrders(d.groups, d.favs);
+		draftRef.current = null;
+		setDraft(null);
+		setSortMode(false);
+		setDragId(null);
+	};
+	const close = () => {
+		saveDraft();
+		onClose();
+	};
+	(0, import_react.useEffect)(() => {
+		sortRef.current = sortMode;
+	}, [sortMode]);
+	(0, import_react.useEffect)(() => {
+		if (!sortMode) return;
+		const applyY = (y) => {
+			const d = dragRef.current;
+			const cur = draftRef.current;
+			if (!d || !cur) return;
+			const nodes = listRef.current?.querySelectorAll(`[data-drag-lane="${d.lane}"]`);
+			if (!nodes?.length) return;
+			const ids = Array.from(nodes).map((el) => el.dataset.rowId).filter((id) => Boolean(id));
+			const next = moveId(ids, d.id, indexFromY(nodes, y));
+			if (next.join("\0") === ids.join("\0")) return;
+			const laneGroups = d.lane.startsWith("g:");
+			const map = { ...laneGroups ? cur.groups : cur.favs };
+			next.forEach((id, i) => {
+				map[id] = i;
+			});
+			const updated = laneGroups ? {
+				...cur,
+				groups: map
+			} : {
+				...cur,
+				favs: map
+			};
+			draftRef.current = updated;
+			setDraft(updated);
+		};
+		const tick = () => {
+			rafRef.current = 0;
+			if (!dragRef.current) return;
+			const scroller = nearestScroller(listRef.current);
+			const dy = scroller ? autoScrollNearEdge(scroller, lastY.current) : 0;
+			applyY(lastY.current);
+			if (dy) rafRef.current = requestAnimationFrame(tick);
+		};
+		const onMove = (e) => {
+			if (!dragRef.current) return;
+			e.preventDefault();
+			lastY.current = e.clientY;
+			const scroller = nearestScroller(listRef.current);
+			const dy = scroller ? autoScrollNearEdge(scroller, e.clientY) : 0;
+			applyY(e.clientY);
+			if (dy && !rafRef.current) rafRef.current = requestAnimationFrame(tick);
+		};
+		const onUp = () => {
+			if (rafRef.current) cancelAnimationFrame(rafRef.current);
+			rafRef.current = 0;
+			const scroller = nearestScroller(listRef.current);
+			if (scroller) scroller.style.touchAction = "";
+			dragRef.current = null;
+			setDragId(null);
+		};
+		window.addEventListener("pointermove", onMove, { passive: false });
+		window.addEventListener("pointerup", onUp);
+		window.addEventListener("pointercancel", onUp);
+		return () => {
+			window.removeEventListener("pointermove", onMove);
+			window.removeEventListener("pointerup", onUp);
+			window.removeEventListener("pointercancel", onUp);
+			if (rafRef.current) cancelAnimationFrame(rafRef.current);
+		};
+	}, [sortMode]);
+	(0, import_react.useEffect)(() => {
+		return () => {
+			window.clearTimeout(pressTimer.current);
+			if (sortRef.current && draftRef.current) useApp.getState().setFavOrders(draftRef.current.groups, draftRef.current.favs);
+		};
+	}, []);
+	const clearPress = () => {
+		window.clearTimeout(pressTimer.current);
+		press.current = null;
+		setHoldId(null);
+	};
+	const enterSort = () => {
+		if (favorites.length + favGroups.length < 2) return;
+		const snap = {
+			groups: {},
+			favs: {}
+		};
+		const parents = /* @__PURE__ */ new Set([null]);
+		for (const g of favGroups) parents.add(g.parentId ?? null);
+		for (const f of favorites) parents.add(f.groupId ?? null);
+		for (const p of parents) {
+			groupsOf(p).forEach((g, i) => {
+				snap.groups[g.id] = i;
+			});
+			favsOf(p).forEach((f, i) => {
+				snap.favs[f.id] = i;
+			});
+		}
+		draftRef.current = {
+			groups: { ...snap.groups },
+			favs: { ...snap.favs }
+		};
+		sortRef.current = true;
+		setDraft(draftRef.current);
+		setSortMode(true);
+		setHoldId(null);
+		setMenu(null);
+		try {
+			navigator.vibrate?.(12);
+		} catch {}
+	};
+	const cancelSort = () => {
+		sortRef.current = false;
+		draftRef.current = null;
+		dragRef.current = null;
+		setDraft(null);
+		setDragId(null);
+		setSortMode(false);
+	};
+	const finishSort = () => {
+		saveDraft();
+	};
+	const onRowPointerDown = (e) => {
+		if (sortRef.current) return;
+		if (e.target.closest("button")) return;
+		if (e.pointerType === "mouse" && e.button !== 0) return;
+		clearPress();
+		if (favorites.length + favGroups.length < 2) return;
+		const id = e.currentTarget.dataset.rowId || "";
+		press.current = { y: e.clientY };
+		setHoldId(id);
+		pressTimer.current = window.setTimeout(enterSort, HOLD_MS$1);
+	};
+	const onRowPointerMove = (e) => {
+		const p = press.current;
+		if (!p || sortRef.current) return;
+		if (Math.abs(e.clientY - p.y) > 12) clearPress();
+	};
+	const onGripDown = (e, id, lane) => {
+		e.preventDefault();
+		e.stopPropagation();
+		dragRef.current = {
+			id,
+			lane
+		};
+		setDragId(id);
+		lastY.current = e.clientY;
+		const el = nearestScroller(listRef.current);
+		if (el) el.style.touchAction = "none";
+		try {
+			e.currentTarget.setPointerCapture(e.pointerId);
+		} catch {}
+	};
+	const openMenu = (el, kind, id) => {
+		const r = el.getBoundingClientRect();
+		const menuW = 132;
+		const menuH = kind === "group" ? 168 : 126;
+		let right = window.innerWidth - r.right;
+		right = Math.max(8, Math.min(right, window.innerWidth - menuW - 8));
+		let top = r.bottom + 4;
+		if (top + menuH > window.innerHeight - 8) top = Math.max(8, r.top - menuH - 4);
+		setMenu({
+			kind,
+			id,
+			top,
+			right
+		});
+	};
+	const fillFav = (fav) => {
+		const next = structuredClone(fav.params);
+		next.seedLocked = false;
+		applyPureParams(next);
+		useApp.getState().toast("已填入");
+	};
+	const rowHandlers = {
+		onPointerDown: onRowPointerDown,
+		onPointerMove: onRowPointerMove,
+		onPointerUp: clearPress,
+		onPointerCancel: clearPress,
+		onContextMenu: (e) => e.preventDefault()
+	};
+	const renderGroups = (parentId, depth) => groupsOf(parentId).map((g) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		"data-drag-lane": `g:${parentId ?? "root"}`,
+		"data-row-id": g.id,
+		className: `flex items-center gap-2 py-1.5 select-none ${dragId === g.id ? "bg-ink/10" : ""} ${!sortMode && holdId === g.id ? "bg-ink/5" : ""}`,
+		style: {
+			marginLeft: depth * 12,
+			touchAction: sortMode ? "pan-y" : "manipulation"
+		},
+		...rowHandlers,
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "flex min-w-0 flex-1 items-center gap-1",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "flex size-5 shrink-0 items-center justify-center rounded-full border border-line text-primary",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Folder, { className: "size-3" })
+					}),
+					g.starred && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Star, { className: "size-3 shrink-0 fill-primary text-primary" }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "min-w-0 truncate text-[15px] font-bold",
+						children: g.name
+					})
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+				type: "button",
+				className: "flex size-8 shrink-0 items-center justify-center text-muted",
+				"aria-label": g.collapsed ? "展开" : "收起",
+				onPointerDown: (e) => e.stopPropagation(),
+				onClick: () => useApp.getState().toggleFavGroup(g.id),
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", {
+					viewBox: "0 0 12 12",
+					className: `size-3 shrink-0 fill-current transition ${g.collapsed ? "" : "rotate-180"}`,
+					"aria-hidden": true,
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M6 9.2 1.4 3.2h9.2L6 9.2z" })
+				})
+			}),
+			sortMode ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+				type: "button",
+				className: "flex size-8 shrink-0 items-center justify-center text-ink/55",
+				"aria-label": "拖动排序",
+				style: { touchAction: "none" },
+				onPointerDown: (e) => onGripDown(e, g.id, `g:${parentId ?? "root"}`),
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(GripBars, {})
+			}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+				type: "button",
+				className: "flex size-8 shrink-0 items-center justify-center text-muted",
+				"aria-label": "更多",
+				onPointerDown: (e) => e.stopPropagation(),
+				onClick: (e) => openMenu(e.currentTarget, "group", g.id),
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Ellipsis, { className: "size-4" })
+			})
+		]
+	}), !g.collapsed && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [renderGroups(g.id, depth + 1), thumbs ? renderThumbs(favsOf(g.id), depth + 1) : favsOf(g.id).map((f) => renderFav(f, depth + 1))] })] }, g.id));
+	const renderFav = (f, depth) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		"data-drag-lane": `f:${f.groupId ?? "root"}`,
+		"data-row-id": f.id,
+		className: `mb-2 flex items-stretch gap-3 rounded-[18px] border border-line bg-card px-3 py-2 select-none ${dragId === f.id ? "bg-ink/15" : ""} ${!sortMode && holdId === f.id ? "bg-ink/8" : ""}`,
+		style: {
+			marginLeft: depth * 12,
+			touchAction: sortMode ? "pan-y" : "manipulation"
+		},
+		...rowHandlers,
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(RatioThumb, {
+				blobId: f.blobId,
+				w: f.params.width,
+				h: f.params.height
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "flex min-h-[72px] min-w-0 flex-1 flex-col",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "flex min-h-0 flex-1 items-center",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "flex min-w-0 items-center gap-1",
+						children: [f.starred && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Star, { className: "size-3 shrink-0 fill-primary text-primary" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "truncate text-[14px] text-ink",
+							children: f.name
+						})]
+					})
+				}), !sortMode && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "flex items-center gap-1",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: "rounded-full border border-line px-2.5 py-0.5 text-[12px] text-ink",
+							onPointerDown: (e) => e.stopPropagation(),
+							onClick: () => fillFav(f),
+							children: "填入"
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "flex-1" }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: "flex size-7 items-center justify-center text-muted",
+							"aria-label": "查看",
+							onPointerDown: (e) => e.stopPropagation(),
+							onClick: () => setOpenId(f.id),
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Eye, { className: "size-4" })
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: "flex size-7 items-center justify-center text-muted",
+							"aria-label": "编辑",
+							onPointerDown: (e) => e.stopPropagation(),
+							onClick: () => setEditId(f.id),
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Pencil, { className: "size-4" })
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: "flex size-7 items-center justify-center text-muted",
+							"aria-label": "更多",
+							onPointerDown: (e) => e.stopPropagation(),
+							onClick: (e) => openMenu(e.currentTarget, "fav", f.id),
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Ellipsis, { className: "size-4" })
+						})
+					]
+				})]
+			}),
+			sortMode && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+				type: "button",
+				className: "flex size-8 shrink-0 items-center justify-center text-ink/55",
+				"aria-label": "拖动排序",
+				style: { touchAction: "none" },
+				onPointerDown: (e) => onGripDown(e, f.id, `f:${f.groupId ?? "root"}`),
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(GripBars, {})
+			})
+		]
+	}, f.id);
+	const renderThumbs = (rows, depth) => rows.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		className: "mb-3 grid grid-cols-4 items-start gap-x-1.5 gap-y-2",
+		style: { marginLeft: depth * 12 },
+		children: rows.map((f) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FavThumb, {
+			fav: f,
+			active: previewId === f.id,
+			onPick: () => onPreview(f.id),
+			onHold: () => setOpenId(f.id),
+			onApply: () => fillFav(f),
+			onMenu: (el) => openMenu(el, "fav", f.id)
+		}, f.id))
+	}) : null;
 	if (current) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FavDetail, {
 		fav: current,
 		currentBlob,
@@ -8520,39 +9590,436 @@ function FavSheet({ currentBlob, onClose }) {
 		onClose,
 		onFill: () => void 0
 	});
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Sheet, {
-		title: "收藏",
-		onClose,
-		extra: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-			className: "rounded-full border border-line bg-card px-3 py-1 text-[12px]",
-			onClick: () => useApp.getState().addFavorite(currentBlob),
-			children: "保存当前"
-		}),
-		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-			className: "flex flex-col gap-2",
-			children: [favorites.map((f) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
-				className: "flex items-center gap-3 rounded-[18px] border border-line bg-card px-3 py-2 text-left",
-				onClick: () => setOpenId(f.id),
+	const pill = "rounded-full border border-line bg-card px-3 py-1 text-[12px]";
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+		/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Sheet, {
+			title: "收藏",
+			onClose: close,
+			header: sortMode ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "flex shrink-0 items-center justify-between gap-3 px-4 py-3",
 				children: [
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(RatioThumb, {
-						blobId: f.blobId,
-						w: f.params.width,
-						h: f.params.height
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "text-[15px] font-medium text-primary",
+						onClick: cancelSort,
+						children: "取消"
 					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-						className: "min-w-0 flex-1 truncate text-[14px]",
-						children: f.name
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "text-[15px] font-medium text-primary",
+						onClick: finishSort,
+						children: "完成"
 					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-						className: "text-[16px] text-muted",
-						children: "›"
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						onClick: close,
+						"aria-label": "关闭",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { className: "size-5" })
 					})
 				]
-			}, f.id)), favorites.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-				className: "py-10 text-center text-[13px] text-muted",
-				children: "还没有收藏。点右上角保存当前参数。"
+			}) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "flex shrink-0 items-center gap-1.5 px-4 py-3",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "shrink-0 text-[16px] font-semibold",
+						children: "收藏"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: thumbs ? "shrink-0 rounded-full bg-danger px-2.5 py-1 text-[12px] text-white" : "shrink-0 rounded-full border border-line bg-card px-2.5 py-1 text-[12px]",
+						onClick: () => useApp.getState().setSettings({ favThumbs: !thumbs }),
+						children: "缩略图"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "min-w-0 flex-1" }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: pill,
+						onClick: () => setNaming({ name: "" }),
+						children: "创建分组"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: pill,
+						onClick: () => useApp.getState().addFavorite(currentBlob),
+						children: "保存当前"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						onClick: close,
+						"aria-label": "关闭",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { className: "size-5" })
+					})
+				]
+			}),
+			children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				ref: listRef,
+				children: [
+					renderGroups(null, 0),
+					thumbs ? renderThumbs(favsOf(null), 0) : favsOf(null).map((f) => renderFav(f, 0)),
+					favorites.length === 0 && favGroups.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "py-10 text-center text-[13px] text-muted",
+						children: "还没有收藏。点右上角保存当前参数。"
+					})
+				]
+			})
+		}),
+		menu && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			className: "fixed inset-0 z-40",
+			onClick: () => setMenu(null),
+			children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "absolute w-[132px] overflow-hidden rounded-[14px] border border-line bg-card text-left text-[14px] text-ink shadow-lg",
+				style: {
+					top: menu.top,
+					right: menu.right
+				},
+				onClick: (e) => e.stopPropagation(),
+				children: [
+					menu.kind === "group" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "block w-full px-3 py-2.5 text-left",
+						onClick: () => {
+							const g = favGroups.find((x) => x.id === menu.id);
+							setNaming({
+								id: menu.id,
+								name: g?.name ?? ""
+							});
+							setMenu(null);
+						},
+						children: "重命名"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: `block w-full px-3 py-2.5 text-left ${menu.kind === "group" ? "border-t border-line" : ""}`,
+						onClick: () => {
+							if (menu.kind === "fav") useApp.getState().deleteFavorite(menu.id);
+							else setAskDelete(menu.id);
+							setMenu(null);
+						},
+						children: "删除"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "block w-full border-t border-line px-3 py-2.5 text-left",
+						onClick: () => {
+							setMove({
+								kind: menu.kind,
+								id: menu.id
+							});
+							setMenu(null);
+						},
+						children: "移动"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "block w-full border-t border-line px-3 py-2.5 text-left",
+						onClick: () => {
+							if (menu.kind === "fav") useApp.getState().toggleFavoriteStar(menu.id);
+							else useApp.getState().toggleFavGroupStar(menu.id);
+							setMenu(null);
+						},
+						children: "星标"
+					})
+				]
+			})
+		}),
+		move && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MoveSheet, {
+			move,
+			groups: favGroups,
+			onClose: () => setMove(null),
+			onPick: (parentId) => {
+				if (move.kind === "fav") useApp.getState().moveFavorite(move.id, parentId);
+				else useApp.getState().moveFavGroup(move.id, parentId);
+				setMove(null);
+			}
+		}),
+		naming && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(NameDialog, {
+			title: naming.id ? "重命名" : "创建分组",
+			value: naming.name,
+			onClose: () => setNaming(null),
+			onOk: (name) => {
+				if (naming.id) useApp.getState().renameFavGroup(naming.id, name);
+				else useApp.getState().addFavGroup(name);
+				setNaming(null);
+			}
+		}),
+		askDelete && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ConfirmDialog, {
+			text: countFavsInGroup(favGroups, favorites, askDelete) > 0 ? `删除这个分组？里面的 ${countFavsInGroup(favGroups, favorites, askDelete)} 条收藏会一起删掉。` : "删除这个分组？",
+			onClose: () => setAskDelete(null),
+			onOk: () => {
+				useApp.getState().deleteFavGroup(askDelete);
+				setAskDelete(null);
+			}
+		}),
+		editing && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FavEdit, {
+			fav: editing,
+			onClose: () => setEditId(null)
+		})
+	] });
+}
+function MoveSheet({ move, groups, onClose, onPick }) {
+	const blocked = move.kind === "group" ? /* @__PURE__ */ new Set([move.id, ...favGroupDescendants(groups, move.id)]) : /* @__PURE__ */ new Set();
+	const rows = [];
+	const walk = (parentId, depth) => {
+		for (const g of [...groups].filter((x) => (x.parentId ?? null) === parentId).sort((a, b) => {
+			if (Boolean(a.starred) !== Boolean(b.starred)) return a.starred ? -1 : 1;
+			return a.order - b.order;
+		})) {
+			if (blocked.has(g.id)) continue;
+			rows.push({
+				g,
+				depth
+			});
+			walk(g.id, depth + 1);
+		}
+	};
+	walk(null, 0);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "absolute inset-0 z-30 flex flex-col justify-end bg-overlay/50",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+			type: "button",
+			className: "min-h-8 flex-1",
+			onClick: onClose
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "flex h-[70%] min-h-0 flex-col overflow-hidden rounded-t-[28px] bg-bg text-ink",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "flex shrink-0 items-center justify-between px-4 py-3",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "text-[16px] font-semibold",
+					children: "移动"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					onClick: onClose,
+					"aria-label": "关闭",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { className: "size-5" })
+				})]
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "min-h-0 flex-1 overflow-y-auto px-4 pb-4",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "mb-2 h-11 w-full rounded-full border border-line bg-card text-[14px]",
+					onClick: () => onPick(null),
+					children: "不放进分组"
+				}), rows.map(({ g, depth }) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "mb-2 block h-11 rounded-full border border-line bg-card px-4 text-left text-[14px]",
+					style: {
+						marginLeft: depth * 16,
+						width: `calc(100% - ${depth * 16}px)`
+					},
+					onClick: () => onPick(g.id),
+					children: g.name
+				}, g.id))]
+			})]
+		})]
+	});
+}
+function NameDialog({ title, value, onClose, onOk }) {
+	const [text, setText] = (0, import_react.useState)(value);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		className: "absolute inset-0 z-30 flex items-center justify-center bg-overlay/50 px-8",
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "w-full rounded-[20px] bg-bg p-4 text-ink",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "mb-3 text-[15px] font-semibold",
+					children: title
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextInput, {
+					value: text,
+					autoFocus: true,
+					placeholder: "分组名称",
+					onChange: (e) => setText(e.target.value)
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "mt-3 flex justify-end gap-4",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "text-[14px] text-muted",
+						onClick: onClose,
+						children: "取消"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "text-[14px] font-medium text-primary",
+						onClick: () => onOk(text),
+						children: "确定"
+					})]
+				})
+			]
+		})
+	});
+}
+function ConfirmDialog({ text, onClose, onOk }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		className: "absolute inset-0 z-30 flex items-center justify-center bg-overlay/50 px-8",
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "w-full rounded-[20px] bg-bg p-4 text-ink",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "text-[14px] leading-relaxed",
+				children: text
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "mt-4 flex justify-end gap-4",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "text-[14px] text-muted",
+					onClick: onClose,
+					children: "取消"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "text-[14px] font-medium text-danger",
+					onClick: onOk,
+					children: "删除"
+				})]
 			})]
 		})
+	});
+}
+function FavEdit({ fav, onClose }) {
+	const p = fav.params;
+	const [name, setName] = (0, import_react.useState)(fav.name);
+	const [front, setFront] = (0, import_react.useState)(p.promptFront);
+	const [mid, setMid] = (0, import_react.useState)(p.promptMid);
+	const [back, setBack] = (0, import_react.useState)(p.promptBack);
+	const [negative, setNegative] = (0, import_react.useState)(p.negative);
+	const [chars, setChars] = (0, import_react.useState)(p.characters.map((c) => ({
+		id: c.id,
+		prompt: c.prompt,
+		uc: c.uc
+	})));
+	const save = () => {
+		const params = structuredClone(p);
+		params.promptFront = front;
+		params.promptMid = mid;
+		params.promptBack = back;
+		params.negative = negative;
+		params.characters = params.characters.map((c) => {
+			const hit = chars.find((x) => x.id === c.id);
+			return hit ? {
+				...c,
+				prompt: hit.prompt,
+				uc: hit.uc
+			} : c;
+		});
+		useApp.getState().patchFavorite(fav.id, {
+			name: name.trim() || "未命名",
+			params
+		});
+		useApp.getState().toast("已保存");
+		onClose();
+	};
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "absolute inset-0 z-30 flex flex-col justify-end bg-overlay/50",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+			type: "button",
+			className: "min-h-8 flex-1",
+			onClick: onClose
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "flex h-[78%] min-h-0 flex-col overflow-hidden rounded-t-[28px] bg-bg text-ink",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "shrink-0 px-4 py-3 text-[16px] font-semibold",
+					children: "编辑收藏"
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "min-h-0 flex-1 overflow-y-auto px-4 pb-4",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "mb-1 text-[12px] text-muted",
+							children: "标题"
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextInput, {
+							value: name,
+							onChange: (e) => setName(e.target.value)
+						}),
+						p.merged ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "mb-1 mt-3 text-[12px] text-muted",
+							children: "正面提示词"
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextArea, {
+							value: mid,
+							onChange: (e) => setMid(e.target.value)
+						})] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+								className: "mb-1 mt-3 text-[12px] text-muted",
+								children: "正面提示词前"
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextArea, {
+								value: front,
+								onChange: (e) => setFront(e.target.value)
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+								className: "mb-1 mt-3 text-[12px] text-muted",
+								children: "正面提示词中"
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextArea, {
+								value: mid,
+								onChange: (e) => setMid(e.target.value)
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+								className: "mb-1 mt-3 text-[12px] text-muted",
+								children: "正面提示词后"
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextArea, {
+								value: back,
+								onChange: (e) => setBack(e.target.value)
+							})
+						] }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "mb-1 mt-3 text-[12px] text-muted",
+							children: "负面提示词"
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextArea, {
+							value: negative,
+							onChange: (e) => setNegative(e.target.value)
+						}),
+						chars.map((c, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "mb-1 mt-3 text-[12px] text-muted",
+								children: [
+									"角色",
+									i + 1,
+									" 正面"
+								]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextArea, {
+								value: c.prompt,
+								onChange: (e) => setChars((rows) => rows.map((x) => x.id === c.id ? {
+									...x,
+									prompt: e.target.value
+								} : x))
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "mb-1 mt-3 text-[12px] text-muted",
+								children: [
+									"角色",
+									i + 1,
+									" 负面"
+								]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextArea, {
+								value: c.uc,
+								onChange: (e) => setChars((rows) => rows.map((x) => x.id === c.id ? {
+									...x,
+									uc: e.target.value
+								} : x))
+							})
+						] }, c.id))
+					]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "flex shrink-0 items-center justify-end gap-3 border-t border-line px-4 py-3",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "h-10 px-3 text-[14px]",
+						onClick: onClose,
+						children: "取消"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "h-10 rounded-full bg-ink px-4 text-[14px] font-medium text-bg",
+						onClick: save,
+						children: "保存修改"
+					})]
+				})
+			]
+		})]
 	});
 }
 function FavDetail({ fav, currentBlob, onBack, onClose, onFill }) {
@@ -8599,8 +10066,8 @@ function FavDetail({ fav, currentBlob, onBack, onClose, onFill }) {
 							className: "h-11 flex-1 rounded-full bg-ink text-[14px] font-medium text-bg",
 							onClick: () => {
 								const next = structuredClone(fav.params);
-								if (next.seed != null) next.seedLocked = true;
-								useApp.getState().setPureParams(next);
+								next.seedLocked = false;
+								applyPureParams(next);
 								useApp.getState().toast("已填入");
 								onFill();
 							},
@@ -8665,6 +10132,90 @@ function FavDetail({ fav, currentBlob, onBack, onClose, onFill }) {
 						children: "应用当前图片为配图"
 					})
 				]
+			})]
+		})]
+	});
+}
+function FavThumb({ fav, active, onPick, onHold, onApply, onMenu }) {
+	const [u, setU] = (0, import_react.useState)(null);
+	const hold = (0, import_react.useRef)(null);
+	const held = (0, import_react.useRef)(false);
+	const moved = (0, import_react.useRef)(false);
+	const start = (0, import_react.useRef)({
+		x: 0,
+		y: 0
+	});
+	(0, import_react.useEffect)(() => {
+		if (fav.blobId) imageUrl(fav.blobId).then(setU);
+		else setU(null);
+	}, [fav.blobId]);
+	const clear = () => {
+		if (hold.current) window.clearTimeout(hold.current);
+		hold.current = null;
+	};
+	const w = fav.params.width > 0 ? fav.params.width : 832;
+	const h = fav.params.height > 0 ? fav.params.height : 1216;
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "flex min-w-0 flex-col",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			className: `overflow-hidden rounded-[8px] bg-dim ${active ? "ring-2 ring-red-500 ring-offset-1 ring-offset-bg" : ""}`,
+			style: { aspectRatio: `${w} / ${h}` },
+			onPointerDown: (e) => {
+				held.current = false;
+				moved.current = false;
+				start.current = {
+					x: e.clientX,
+					y: e.clientY
+				};
+				clear();
+				hold.current = window.setTimeout(() => {
+					held.current = true;
+				}, HOLD_MS$1);
+			},
+			onPointerMove: (e) => {
+				if (Math.abs(e.clientX - start.current.x) > 10 || Math.abs(e.clientY - start.current.y) > 10) {
+					moved.current = true;
+					clear();
+				}
+			},
+			onPointerUp: (e) => {
+				const was = held.current;
+				const skip = moved.current;
+				clear();
+				held.current = false;
+				e.stopPropagation();
+				if (skip) return;
+				if (was) onHold();
+				else onPick();
+			},
+			onPointerCancel: clear,
+			onContextMenu: (e) => e.preventDefault(),
+			children: u ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+				src: u,
+				alt: "",
+				className: "size-full object-contain"
+			}) : null
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "mt-1 flex items-stretch gap-0.5",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+				type: "button",
+				className: "min-w-0 flex-1 whitespace-nowrap rounded-full border border-line py-0.5 text-[10px] leading-tight text-ink",
+				onPointerDown: (e) => e.stopPropagation(),
+				onClick: (e) => {
+					e.stopPropagation();
+					onApply();
+				},
+				children: "应用参数"
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+				type: "button",
+				className: "flex w-5 shrink-0 items-center justify-center text-muted",
+				"aria-label": "更多",
+				onPointerDown: (e) => e.stopPropagation(),
+				onClick: (e) => {
+					e.stopPropagation();
+					onMenu(e.currentTarget);
+				},
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Ellipsis, { className: "size-3" })
 			})]
 		})]
 	});
@@ -8772,8 +10323,8 @@ function HistCell({ item, active, onPreview }) {
 					if (p) {
 						const next = structuredClone(p);
 						next.seed = item.seed;
-						next.seedLocked = true;
-						useApp.getState().setPureParams(next);
+						next.seedLocked = false;
+						applyPureParams(next);
 					} else useApp.getState().setPureParams({
 						model: item.model,
 						width: item.width,
@@ -8781,10 +10332,11 @@ function HistCell({ item, active, onPreview }) {
 						steps: item.steps,
 						sampler: item.sampler,
 						seed: item.seed,
-						seedLocked: true,
+						seedLocked: false,
 						negative: item.negative,
 						promptMid: item.prompt,
-						merged: true
+						merged: true,
+						img2imgBlobId: ""
 					});
 					useApp.getState().toast("已应用参数");
 				},
@@ -8879,7 +10431,7 @@ function ReadMeta() {
 		]
 	});
 }
-async function drawOne(setPhase) {
+async function drawOne(setPhase, showId) {
 	const params = useApp.getState().pureParams;
 	const settings = useApp.getState().settings;
 	if (!settings.naiKey) {
@@ -8924,6 +10476,7 @@ async function drawOne(setPhase) {
 			status: "done"
 		};
 		useApp.getState().addHistory(rec);
+		showId(rec.id);
 	} catch (e) {
 		useApp.getState().toast(imageFailText(e, ac.signal));
 	} finally {
@@ -9041,7 +10594,7 @@ function RoleEditor({ chat, mode }) {
 		}));
 		useApp.getState().commitChat(chat.id);
 		if (mode === "create") {
-			const { sendOpening } = await import("./chat-actions-xXtSMv4d.mjs");
+			const { sendOpening } = await import("./chat-actions-BzFvtzjH.mjs");
 			sendOpening(chat.id);
 		} else useApp.getState().toast("设定已保存");
 	};
@@ -9235,6 +10788,20 @@ function RoleEditor({ chat, mode }) {
 						} : c) }),
 						onRegen: () => runField("speech", char.id),
 						onPersonal: () => openPersonalize("speech", char.id)
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(LookRef, {
+						blobId: char.lookBlobId,
+						onPick: async (file) => {
+							const id = await saveBlob(await compressRef(file, 768, .82));
+							patch({ characters: chat.characters.map((c) => c.id === char.id ? {
+								...c,
+								lookBlobId: id
+							} : c) });
+						},
+						onClear: () => patch({ characters: chat.characters.map((c) => c.id === char.id ? {
+							...c,
+							lookBlobId: ""
+						} : c) })
 					}),
 					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(FieldBlock, {
 						label: "外貌备忘",
@@ -9517,6 +11084,63 @@ function FieldBlock({ label, hint, value, placeholder, onChange, onRegen, onPers
 			className: grow ? "min-h-[calc(1.5rem+12*1.625em)]" : "min-h-[calc(1.5rem+5*1.625em)]",
 			onChange: (e) => onChange(e.target.value)
 		})]
+	});
+}
+function LookRef({ blobId, onPick, onClear }) {
+	const input = (0, import_react.useRef)(null);
+	const [url, setUrl] = (0, import_react.useState)(null);
+	(0, import_react.useEffect)(() => {
+		if (!blobId) {
+			setUrl(null);
+			return;
+		}
+		let dead = false;
+		imageUrl(blobId).then((u) => {
+			if (!dead) setUrl(u);
+		});
+		return () => {
+			dead = true;
+		};
+	}, [blobId]);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "mb-3 flex items-center gap-2 px-1",
+		children: [
+			url ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "relative",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+					src: url,
+					alt: "",
+					className: "size-16 rounded-[12px] object-cover"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "absolute -right-1 -top-1 grid size-5 place-items-center rounded-full bg-card text-ink",
+					"aria-label": "去掉外貌参考",
+					onClick: onClear,
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { className: "size-3" })
+				})]
+			}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+				type: "button",
+				className: "grid size-9 place-items-center rounded-full border border-line text-muted",
+				"aria-label": "上传外貌参考",
+				onClick: () => input.current?.click(),
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Plus, { className: "size-4" })
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				className: "text-[12px] text-muted",
+				children: "外貌参考，只给聊天看"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+				ref: input,
+				type: "file",
+				accept: "image/*",
+				className: "hidden",
+				onChange: (e) => {
+					const file = e.target.files?.[0];
+					if (file) onPick(file);
+					e.target.value = "";
+				}
+			})
+		]
 	});
 }
 function Extras({ extras, onChange }) {
@@ -10564,7 +12188,7 @@ function MultiCreateModal() {
 					const draft = makeDraft();
 					pushDraft(draft);
 					useApp.getState().commitChat(draft.id);
-					const { sendOpening } = await import("./chat-actions-xXtSMv4d.mjs");
+					const { sendOpening } = await import("./chat-actions-BzFvtzjH.mjs");
 					sendOpening(draft.id);
 				},
 				children: "跳过，开始聊天"
@@ -10579,4 +12203,4 @@ function Home() {
 	});
 }
 //#endregion
-export { imageWriteFields as A, randomSeed as B, defaultSettings as C, imageAiLabel as D, idb_exports as E, nearestScroller as F, snapshotLlmAccount as G, resolveImageWrite as H, parseChatCompletionPreset as I, uniqueNumberedName as J, sortHistoryNewestFirst as K, presetStyle as L, llmIdentity as M, loadAll as N, imagePickerModels as O, moveId as P, pruneStarred as R, db as S, downloadBlob as T, restoreSampler as U, rememberUrl as V, samplerPatch as W, uniquePresetName as Y, applyLlmPick as _, cancelMemory as a, chatPickerModels as b, regenMessage as c, Home as component, sendOpening as d, sendUser as f, applyImageAiPick as g, activePreset as h, cancelImage as i, indexFromY as j, imageUrl as k, retryMemory as l, FOLLOW_IMAGE_AI as m, attachImage as n, editMessage as o, routes_DGEvAUKS_exports as p, uid as q, branchFrom as r, invalidateMemory as s, abortChat as t, runManualMemory as u, autoScrollNearEdge as v, deleteImage as w, cn as x, cachedUrl as y, putImage as z };
+export { imageUrl as A, putImage as B, defaultSettings as C, idb_exports as D, getImage as E, moveId as F, samplerPatch as G, rememberUrl as H, nearestScroller as I, uid as J, snapshotLlmAccount as K, parseChatCompletionPreset as L, indexFromY as M, llmIdentity as N, imageAiLabel as O, loadAll as P, presetStyle as R, db as S, downloadBlob as T, resolveImageWrite as U, randomSeed as V, restoreSampler as W, uniquePresetName as X, uniqueNumberedName as Y, applyLlmPick as _, cancelMemory as a, chatPickerModels as b, regenMessage as c, Home as component, sendOpening as d, sendUser as f, applyImageAiPick as g, activePreset as h, cancelImage as i, imageWriteFields as j, imagePickerModels as k, retryMemory as l, FOLLOW_IMAGE_AI as m, attachImage as n, editMessage as o, routes_CMbMyqb9_exports as p, sortHistoryNewestFirst as q, branchFrom as r, invalidateMemory as s, abortChat as t, runManualMemory as u, autoScrollNearEdge as v, deleteImage as w, cn as x, cachedUrl as y, pruneStarred as z };

@@ -110,6 +110,7 @@ function copyRoleBody(dst: Character, src: Character): Character {
     persona: src.persona,
     speech: src.speech,
     appearance: src.appearance,
+    lookBlobId: src.lookBlobId,
     personaVoices: src.personaVoices ?? dst.personaVoices,
     extras: src.extras ?? dst.extras,
   };
@@ -159,7 +160,12 @@ interface UI {
   paramsJump: string | null;
   llmSettings: boolean;
   memoryHint: { chatId: string; state: "generating" | "ok" | "fail"; error?: string; draft?: string } | null;
-  editUserMsg: { chatId: string; msgId: string; backup: string } | null;
+  editUserMsg: {
+    chatId: string;
+    msgId: string;
+    backup: string;
+    shotBackup: { blobId: string; i2i: boolean } | null;
+  } | null;
 }
 
 interface State {
@@ -178,6 +184,7 @@ interface State {
   toasts: Toast[];
   ui: UI;
   composerDrafts: Record<string, string>;
+  composerShots: Record<string, { blobId: string; i2i: boolean }>;
   hydrate: () => Promise<void>;
   toast: (text: string) => void;
   setUI: (p: Partial<UI>) => void;
@@ -230,6 +237,7 @@ interface State {
   deleteHistory: (id: string) => void;
   setCooldown: (until: number) => void;
   setComposerDraft: (chatId: string, text: string) => void;
+  setComposerShot: (chatId: string, shot: { blobId: string; i2i: boolean } | null) => void;
 }
 
 const ui0 = (): UI => ({
@@ -285,13 +293,15 @@ export const useApp = create<State>((set, get) => ({
   toasts: [],
   ui: ui0(),
   composerDrafts: {},
+  composerShots: {},
 
   hydrate: async () => {
     const data = await loadAll();
-    const [pureRow, currentRow, draftsRow] = await Promise.all([
+    const [pureRow, currentRow, draftsRow, shotsRow] = await Promise.all([
       db.kv.get("pureParams"),
       db.kv.get("currentId"),
       db.kv.get("composerDrafts"),
+      db.kv.get("composerShots"),
     ]);
     const live = data.chats.filter((c) => !c.isDraft).map((c) => {
       const mapped = {
@@ -333,6 +343,7 @@ export const useApp = create<State>((set, get) => ({
       currentId,
       history: sortHistoryNewestFirst(data.history ?? []),
       composerDrafts: parseComposerDrafts(draftsRow?.value),
+      composerShots: parseComposerShots(shotsRow?.value),
     });
   },
 
@@ -535,12 +546,15 @@ export const useApp = create<State>((set, get) => ({
     void db.folders.bulkDelete([...ids]);
     set((s) => {
       const composerDrafts = dropDrafts(s.composerDrafts, ids);
+      const composerShots = dropShots(s.composerShots, ids);
       void db.kv.put({ key: "composerDrafts", value: composerDrafts });
+      void db.kv.put({ key: "composerShots", value: composerShots });
       return {
         chats: moved,
         folders,
         currentId: ids.has(s.currentId || "") ? moved[0]?.id ?? null : s.currentId,
         composerDrafts,
+        composerShots,
         ui: { ...s.ui, selectMode: false, selected: [], sortMode: false, menuId: null },
       };
     });
@@ -1007,6 +1021,16 @@ export const useApp = create<State>((set, get) => ({
       return { composerDrafts };
     });
   },
+
+  setComposerShot: (chatId, shot) => {
+    set((s) => {
+      const composerShots = { ...s.composerShots };
+      if (shot?.blobId) composerShots[chatId] = { blobId: shot.blobId, i2i: shot.i2i };
+      else delete composerShots[chatId];
+      void db.kv.put({ key: "composerShots", value: composerShots });
+      return { composerShots };
+    });
+  },
 }));
 
 function parseComposerDrafts(raw: unknown): Record<string, string> {
@@ -1020,6 +1044,23 @@ function parseComposerDrafts(raw: unknown): Record<string, string> {
 
 function dropDrafts(drafts: Record<string, string>, ids: Set<string>) {
   const next = { ...drafts };
+  for (const id of ids) delete next[id];
+  return next;
+}
+
+function parseComposerShots(raw: unknown): Record<string, { blobId: string; i2i: boolean }> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: Record<string, { blobId: string; i2i: boolean }> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!k || !v || typeof v !== "object") continue;
+    const row = v as { blobId?: unknown; i2i?: unknown };
+    if (typeof row.blobId === "string" && row.blobId) out[k] = { blobId: row.blobId, i2i: row.i2i === true };
+  }
+  return out;
+}
+
+function dropShots(shots: Record<string, { blobId: string; i2i: boolean }>, ids: Set<string>) {
+  const next = { ...shots };
   for (const id of ids) delete next[id];
   return next;
 }
@@ -1045,10 +1086,16 @@ function liftImageAi(
 
 function blobInUse(s: State, blobId: string, skipFav?: string) {
   if (s.favorites.some((f) => f.blobId === blobId && f.id !== skipFav)) return true;
+  if (s.favorites.some((f) => f.params.img2imgBlobId === blobId)) return true;
+  if (s.pureParams.img2imgBlobId === blobId) return true;
   if (s.history.some((h) => h.blobId === blobId)) return true;
+  if (s.cards.some((card) => card.characters.some((c) => c.lookBlobId === blobId))) return true;
   for (const c of s.chats) {
     if (c.avatarBlobId === blobId) return true;
+    if (c.imageParams.img2imgBlobId === blobId) return true;
+    if (c.characters.some((ch) => ch.lookBlobId === blobId)) return true;
     for (const m of c.messages) {
+      if (m.userImageBlobId === blobId) return true;
       if (m.images.some((g) => g.blobId === blobId)) return true;
     }
   }

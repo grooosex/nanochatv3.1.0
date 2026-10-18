@@ -350,6 +350,38 @@ export function ToastHost() {
   );
 }
 
+export function ZoomImg({ src, className }: { src: string; className?: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" className="block bg-transparent p-0" aria-label="查看大图" onClick={() => setOpen(true)}>
+        <img src={src} alt="" className={className} />
+      </button>
+      {open ? (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setOpen(false)}
+        >
+          <button
+            type="button"
+            className="absolute right-3 top-[max(12px,env(safe-area-inset-top))] grid size-10 place-items-center rounded-full bg-card text-ink"
+            aria-label="关闭"
+            onClick={() => setOpen(false)}
+          >
+            <X className="size-5" />
+          </button>
+          <img
+            src={src}
+            alt=""
+            className="max-h-full max-w-full object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 export function Modal({
   open,
   onClose,

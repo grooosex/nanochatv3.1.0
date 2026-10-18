@@ -3,7 +3,7 @@ import { _ as lazyRouteComponent, b as useRouter, f as Scripts, g as Outlet, h a
 import { r as unzipSync } from "../_libs/fflate.mjs";
 import { i as TriangleAlert } from "../_libs/lucide-react.mjs";
 import { a as union, i as string, n as number, r as object, t as literal } from "../_libs/zod.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/router-Wq2WyM9m.js
+//#region node_modules/.nitro/vite/services/ssr/assets/router-DcqrjO68.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 var __defProp = Object.defineProperty;
@@ -1072,7 +1072,7 @@ function PreviewHostBridge() {
 	}, [router]);
 	return null;
 }
-var styles_default = "/assets/styles-Ba9KnWa5.css";
+var styles_default = "/assets/styles-BRltbF2p.css";
 var APP_NAME = "绘语";
 var Route$4 = createRootRoute({
 	head: () => ({
@@ -1122,7 +1122,7 @@ var Route$4 = createRootRoute({
 		] })]
 	})
 });
-var $$splitComponentImporter = () => import("./routes-DGEvAUKS.mjs").then((n) => n.p);
+var $$splitComponentImporter = () => import("./routes-CMbMyqb9.mjs").then((n) => n.p);
 var Route$3 = createFileRoute("/")({ component: lazyRouteComponent($$splitComponentImporter, "component") });
 var GROK_MODELS = {
 	"grok-4.6-high": {
@@ -1169,7 +1169,6 @@ async function callXai(opts) {
 	};
 	if (opts.topP != null) payload.top_p = opts.topP;
 	if (opts.frequencyPenalty != null) payload.frequency_penalty = opts.frequencyPenalty;
-	if (opts.presencePenalty != null) payload.presence_penalty = opts.presencePenalty;
 	const res = await fetch("https://api.x.ai/v1/chat/completions", {
 		method: "POST",
 		headers: {
@@ -1213,8 +1212,7 @@ var Route$2 = createFileRoute("/api/grok")({ server: { handlers: { POST: async (
 			max_tokens: body.max_tokens ?? p?.maxTokens,
 			temperature: p?.temperature,
 			topP: p?.topP,
-			frequencyPenalty: p?.frequencyPenalty,
-			presencePenalty: p?.presencePenalty
+			frequencyPenalty: p?.frequencyPenalty
 		});
 		if (!result.ok) return Response.json({
 			ok: false,
@@ -1271,8 +1269,7 @@ var Route$2 = createFileRoute("/api/grok")({ server: { handlers: { POST: async (
 		max_tokens: body.max_tokens ?? p?.maxTokens ?? (task === "image" || task === "rewrite" ? 800 : 8192),
 		temperature: p?.temperature,
 		topP: p?.topP,
-		frequencyPenalty: p?.frequencyPenalty,
-		presencePenalty: p?.presencePenalty
+		frequencyPenalty: p?.frequencyPenalty
 	});
 	if (!result.ok) return Response.json({
 		ok: false,

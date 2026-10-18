@@ -265,7 +265,12 @@ function applyPureParams(next: ImageParams) {
   if (s.settings.pureCharLocked) {
     next = { ...next, characters: structuredClone(s.pureParams.characters), useCoords: s.pureParams.useCoords };
   }
-  s.setPureParams(next);
+  s.setPureParams({
+    ...next,
+    img2imgBlobId: next.img2imgBlobId || "",
+    img2imgStrength: next.img2imgStrength ?? 0.7,
+    img2imgNoise: next.img2imgNoise ?? 0,
+  });
 }
 
 function FavSheet({
@@ -1301,6 +1306,7 @@ function HistCell({ item, active, onPreview }: { item: HistoryItem; active?: boo
               negative: item.negative,
               promptMid: item.prompt,
               merged: true,
+              img2imgBlobId: "",
             });
           }
           useApp.getState().toast("已应用参数");

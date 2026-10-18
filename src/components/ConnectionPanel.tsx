@@ -139,7 +139,7 @@ export function ConnectionPanel() {
         >
           <div className="mb-1 font-medium">Grok</div>
           <p className="text-[12px] leading-relaxed text-muted">
-            已使用当前 Grok 会员账号，无需再登录。选中后聊天、润色、写提示词都走 Grok。顶栏切换 4.6 / 4.5 均衡、专家、快速。
+            已使用当前 Grok 会员账号，无需再登录。选中后聊天、润色、写提示词都走 Grok。顶栏切换 4.7 / 4.6 / 4.5 均衡、专家、快速。
           </p>
         </button>
 

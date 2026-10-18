@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { systemFor } from "@/lib/prompts";
 
-type Msg = { role: "system" | "user" | "assistant"; content: string };
+type Msg = { role: "system" | "user" | "assistant"; content: string | object };
 
 type LlmParams = {
   temperature?: number;

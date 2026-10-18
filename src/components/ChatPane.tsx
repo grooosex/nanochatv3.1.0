@@ -8,14 +8,17 @@ import {
   GitBranch,
   Loader2,
   Pencil,
+  Plus,
   RefreshCw,
   Sparkles,
   Wand2,
+  X,
 } from "lucide-react";
 import { imageUrl } from "@/lib/idb";
+import { compressRef } from "@/lib/ref-image";
 import { modelLabel, samplerLabel } from "@/lib/nai";
 import { extractGrokTail } from "@/lib/nai-tags";
-import { useApp } from "@/lib/store";
+import { saveBlob, useApp } from "@/lib/store";
 import { downloadBlob, cn } from "@/lib/utils";
 import { foldWindow, genPhaseLabel, stripStatus } from "@/lib/engine";
 import { memoryCaughtUp } from "@/lib/chat-memory";
@@ -24,7 +27,7 @@ import { parseReplyMarkup, type ReplyFold } from "@/lib/reply-markup";
 import type { Chat, ChatMessage, GenImage, ImageGenSource, MultiMode, PromptInsertMode } from "@/lib/types";
 import { attachImage, branchFrom, cancelImage, cancelMemory, editMessage, regenMessage, retryMemory, sendUser } from "./chat-actions";
 import { ChatModelSelect } from "./ModelSelect";
-import { ChatAvatar, ExpandSelect, Modal, TextArea, useCooldown } from "./ui-kit";
+import { ChatAvatar, ExpandSelect, Modal, TextArea, useCooldown, ZoomImg } from "./ui-kit";
 
 export function ChatPane({ chat }: { chat: Chat }) {
   const cooldownUntil = useApp((s) => s.settings.cooldownUntil);
@@ -36,6 +39,23 @@ export function ChatPane({ chat }: { chat: Chat }) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [atBottom, setAtBottom] = useState(true);
   const draft = useApp((s) => s.composerDrafts[chat.id] ?? "");
+  const shot = useApp((s) => s.composerShots[chat.id]);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [shotUrl, setShotUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!shot?.blobId) {
+      setShotUrl(null);
+      return;
+    }
+    let dead = false;
+    void imageUrl(shot.blobId).then((u) => {
+      if (!dead) setShotUrl(u);
+    });
+    return () => {
+      dead = true;
+    };
+  }, [shot?.blobId]);
 
   useEffect(() => {
     const el = scroller.current;
@@ -57,30 +77,44 @@ export function ChatPane({ chat }: { chat: Chat }) {
     useApp.getState().patchChat(chat.id, { scrollTop: el.scrollTop });
   };
 
-  const startUserEdit = (msgId: string, content: string) => {
+  const startUserEdit = (msg: ChatMessage) => {
     const backup = editUser ? editUser.backup : draft;
-    useApp.getState().setUI({ editUserMsg: { chatId: chat.id, msgId, backup } });
-    useApp.getState().setComposerDraft(chat.id, content);
+    const shotBackup = editUser ? editUser.shotBackup : shot?.blobId ? { blobId: shot.blobId, i2i: shot.i2i } : null;
+    useApp.getState().setUI({ editUserMsg: { chatId: chat.id, msgId: msg.id, backup, shotBackup } });
+    useApp.getState().setComposerDraft(chat.id, msg.content);
+    useApp.getState().setComposerShot(
+      chat.id,
+      msg.userImageBlobId ? { blobId: msg.userImageBlobId, i2i: Boolean(msg.userImageI2i) } : null,
+    );
     requestAnimationFrame(() => inputRef.current?.focus());
   };
 
   const cancelUserEdit = () => {
     if (!editUser) return;
     useApp.getState().setComposerDraft(chat.id, editUser.backup);
+    useApp.getState().setComposerShot(chat.id, editUser.shotBackup);
     useApp.getState().setUI({ editUserMsg: null });
   };
 
   const send = () => {
     const t = draft;
     if (editUser) {
-      const { msgId, backup } = editUser;
+      const pending = shot?.blobId ? { blobId: shot.blobId, i2i: shot.i2i } : null;
+      if (!t.trim() && !pending) {
+        useApp.getState().toast("写点字，或留一张图");
+        return;
+      }
+      const { msgId, backup, shotBackup } = editUser;
       useApp.getState().setUI({ editUserMsg: null });
       useApp.getState().setComposerDraft(chat.id, backup);
-      void editMessage(chat.id, msgId, t);
+      useApp.getState().setComposerShot(chat.id, shotBackup);
+      void editMessage(chat.id, msgId, t, pending);
       return;
     }
     useApp.getState().setComposerDraft(chat.id, "");
-    void sendUser(chat.id, t);
+    const pending = shot?.blobId ? { blobId: shot.blobId, i2i: shot.i2i } : undefined;
+    useApp.getState().setComposerShot(chat.id, null);
+    void sendUser(chat.id, t, pending);
   };
 
   const portrait = chat.imageParams.height >= chat.imageParams.width;
@@ -146,7 +180,7 @@ export function ChatPane({ chat }: { chat: Chat }) {
               useApp.getState().setComposerDraft(chat.id, t);
               requestAnimationFrame(() => inputRef.current?.focus());
             }}
-            onEditUser={m.role === "user" ? () => startUserEdit(m.id, m.content) : undefined}
+            onEditUser={m.role === "user" ? () => startUserEdit(m) : undefined}
           />
         ))}
       </div>
@@ -224,6 +258,32 @@ export function ChatPane({ chat }: { chat: Chat }) {
             ) : null}
           </div>
         ) : null}
+        {shot?.blobId ? (
+          <div className="mb-2 ml-11 flex items-end gap-2">
+            <div className="relative">
+              {shotUrl ? (
+                <ZoomImg src={shotUrl} className="h-24 w-20 rounded-[14px] object-cover" />
+              ) : (
+                <div className="h-24 w-20 rounded-[14px] bg-dim" />
+              )}
+              <button
+                type="button"
+                className="absolute -right-1 -top-1 z-10 grid size-6 place-items-center rounded-full bg-card text-ink"
+                aria-label="去掉图片"
+                onClick={() => useApp.getState().setComposerShot(chat.id, null)}
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
+            <button
+              type="button"
+              className={`rounded-full border px-2.5 py-1 text-[12px] ${shot.i2i ? "border-primary bg-primary text-on-primary" : "border-line text-muted"}`}
+              onClick={() => useApp.getState().setComposerShot(chat.id, { blobId: shot.blobId, i2i: !shot.i2i })}
+            >
+              以图生图
+            </button>
+          </div>
+        ) : null}
         <div className="flex items-end gap-2">
           <button
             className="grid size-9 shrink-0 place-items-center rounded-full text-muted"
@@ -252,6 +312,29 @@ export function ChatPane({ chat }: { chat: Chat }) {
             className="max-h-32 min-h-[46px] flex-1 resize-none rounded-full border border-line bg-card px-4 py-3 text-[14px] outline-none"
           />
           <button
+            type="button"
+            className="grid size-11 shrink-0 place-items-center rounded-full border border-line text-ink"
+            aria-label="添加图片"
+            onClick={() => fileRef.current?.click()}
+          >
+            <Plus className="size-5" />
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (!file) return;
+              void compressRef(file, 1024, 0.85).then(async (blob) => {
+                const id = await saveBlob(blob);
+                useApp.getState().setComposerShot(chat.id, { blobId: id, i2i: false });
+              });
+            }}
+          />
+          <button
             onClick={send}
             className="grid size-11 shrink-0 place-items-center rounded-full bg-primary text-on-primary"
             aria-label={editUser ? "保存" : "发送"}
@@ -267,6 +350,29 @@ export function ChatPane({ chat }: { chat: Chat }) {
           </div>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+function UserShot({ blobId, i2i }: { blobId: string; i2i?: boolean }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let dead = false;
+    void imageUrl(blobId).then((u) => {
+      if (!dead) setUrl(u);
+    });
+    return () => {
+      dead = true;
+    };
+  }, [blobId]);
+  return (
+    <div className="mb-1.5 flex max-w-[85%] flex-col items-end">
+      {url ? (
+        <ZoomImg src={url} className="h-28 max-w-full rounded-[14px] object-cover" />
+      ) : (
+        <div className="h-28 w-24 rounded-[14px] bg-dim" />
+      )}
+      {i2i ? <div className="mt-1 text-[11px] text-muted">以图生图</div> : null}
     </div>
   );
 }
@@ -309,14 +415,17 @@ function Bubble({
   if (msg.role === "user") {
     return (
       <div className="mb-4 flex flex-col items-end">
-        <div
-          className={cn(
-            "w-fit min-h-[2.75rem] min-w-[5.5rem] max-w-[85%] rounded-[18px] border px-4 py-2.5",
-            editingUser ? "border-primary bg-card" : "border-line bg-card",
-          )}
-        >
-          <div className="whitespace-pre-wrap text-[14px] leading-relaxed text-ink">{msg.content}</div>
-        </div>
+        {msg.userImageBlobId ? <UserShot blobId={msg.userImageBlobId} i2i={msg.userImageI2i} /> : null}
+        {msg.content.trim() ? (
+          <div
+            className={cn(
+              "w-fit min-h-[2.75rem] min-w-[5.5rem] max-w-[85%] rounded-[18px] border px-4 py-2.5",
+              editingUser ? "border-primary bg-card" : "border-line bg-card",
+            )}
+          >
+            <div className="whitespace-pre-wrap text-[14px] leading-relaxed text-ink">{msg.content}</div>
+          </div>
+        ) : null}
         <div className="mt-1.5 flex justify-end gap-1.5">
           <Mini onClick={() => onEditUser?.()} icon={<Pencil className="size-3" />} label="编辑" />
           <Mini onClick={() => void branchFrom(chat.id, msg.id)} icon={<GitBranch className="size-3" />} label="开分支" />

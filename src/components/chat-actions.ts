@@ -1,6 +1,7 @@
 import {
   afterPaint,
   chatContextBlock,
+  decorateVision,
   foldWindow,
   generateNai,
   groupFormatHint,
@@ -64,10 +65,15 @@ export async function sendOpening(id: string) {
   await runReply(id, null, true);
 }
 
-export async function sendUser(id: string, text: string) {
+export async function sendUser(id: string, text: string, shot?: { blobId: string; i2i: boolean }) {
   const t = text.trim();
   abortChat(id);
-  patch(id, (c) => ({ ...c, messages: [...c.messages, makeUserMessage(t)] }));
+  const msg = makeUserMessage(t);
+  if (shot?.blobId) {
+    msg.userImageBlobId = shot.blobId;
+    msg.userImageI2i = shot.i2i;
+  }
+  patch(id, (c) => ({ ...c, messages: [...c.messages, msg] }));
   await runReply(id, t, false);
 }
 
@@ -231,10 +237,11 @@ async function runReply(id: string, _userText: string | null, opening: boolean, 
 
   const live = chat(id)!;
   const prevScene = previousRoundImagePrompt(live.messages, placeholder.id);
-  const msgs = historyMessages(live).filter((m) => m.content);
-  if (opening && msgs.length === 0) {
-    msgs.push({ role: "user", content: formatUserForChat(OPENING_USER, standingDirectives(live)) });
+  const hist = historyMessages(live).filter((m) => m.content);
+  if (opening && hist.length === 0) {
+    hist.push({ role: "user", content: formatUserForChat(OPENING_USER, standingDirectives(live)) });
   }
+  const msgs = await decorateVision(live, hist);
 
   let raw = "";
   let promptStarted = false;
@@ -429,6 +436,7 @@ export async function attachImage(
       seed: img.seed,
       apiKey: settings.naiKey,
       baseUrl: settings.naiBase,
+      turnImageBlobId: turnI2iBlob(live, msgId),
       signal: ac.signal,
       onStart: () => setImg({ status: "generating" }),
       onReceiving: () => {
@@ -453,6 +461,16 @@ export async function attachImage(
   } finally {
     if (imageAborts.get(key) === ac) imageAborts.delete(key);
   }
+}
+
+function turnI2iBlob(c: Chat, msgId: string) {
+  if (c.imageParams.img2imgBlobId) return undefined;
+  const idx = c.messages.findIndex((m) => m.id === msgId);
+  for (let i = idx - 1; i >= 0; i--) {
+    const m = c.messages[i];
+    if (m.role === "user") return m.userImageI2i ? m.userImageBlobId : undefined;
+  }
+  return undefined;
 }
 
 function mapCharTails(c: Chat, chars: Record<string, string>) {
@@ -641,7 +659,12 @@ export async function runManualMemory(id: string, mode: "current" | "all") {
   }
 }
 
-export async function editMessage(id: string, msgId: string, text: string) {
+export async function editMessage(
+  id: string,
+  msgId: string,
+  text: string,
+  shot?: { blobId: string; i2i: boolean } | null,
+) {
   const c = chat(id);
   if (!c) return;
   const idx = c.messages.findIndex((m) => m.id === msgId);
@@ -650,9 +673,17 @@ export async function editMessage(id: string, msgId: string, text: string) {
   if (msg.role === "user") {
     abortChat(id);
     bumpMemoryEpoch(id);
+    const next: ChatMessage = { ...msg, content: text.trim() };
+    if (shot === null) {
+      delete next.userImageBlobId;
+      delete next.userImageI2i;
+    } else if (shot) {
+      next.userImageBlobId = shot.blobId;
+      next.userImageI2i = shot.i2i;
+    }
     patch(id, (ch) => ({
       ...ch,
-      messages: [...ch.messages.slice(0, idx), { ...msg, content: text.trim() }],
+      messages: [...ch.messages.slice(0, idx), next],
       ...applySnaps(rewindSnaps(ch.memorySnaps, idx)),
     }));
     await runReply(id, text.trim(), false);

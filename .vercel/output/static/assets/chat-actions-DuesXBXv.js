@@ -1,1 +1,0 @@
-import{f as e}from"./routes-BBgIxmdi.js";export{e as sendOpening};
